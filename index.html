@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AED Map Thailand - แผนที่จุดติดตั้งเครื่องกระตุกหัวใจ</title>
+    <title>AED Map Thailand (Cloud) - แผนที่จุดติดตั้งเครื่องกระตุกหัวใจ</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -84,7 +84,7 @@
     <div id="loading">
         <div class="text-red-500 text-5xl mb-4"><i class="fa-solid fa-heart-pulse fa-beat"></i></div>
         <h1 class="text-2xl font-bold text-gray-800">AED Map Thailand</h1>
-        <p class="text-gray-500 mb-8">กำลังค้นหาตำแหน่งของคุณ...</p>
+        <p id="loading-text" class="text-gray-500 mb-8">กำลังเชื่อมต่อฐานข้อมูล Cloud...</p>
         
         <!-- Credit on Loading Screen -->
         <div class="absolute bottom-10 text-center">
@@ -99,7 +99,7 @@
             <div class="bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center">
                 <i class="fa-solid fa-heart-pulse"></i>
             </div>
-            <h1 class="font-bold text-gray-800 text-lg">AED Map</h1>
+            <h1 class="font-bold text-gray-800 text-lg">AED Map <span class="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full ml-1">Online</span></h1>
         </div>
         <a href="tel:1669" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2 animate-pulse">
             <i class="fa-solid fa-phone"></i> 1669
@@ -115,7 +115,7 @@
             Dev by พว.วิษณุกรณ์ โอยา
         </p>
     </div>
-<div id="sfc94uk4l89zs1gnmzq8zb3qjha7tw7gkge"></div><script type="text/javascript" src="https://counter1.optistats.ovh/private/counter.js?c=94uk4l89zs1gnmzq8zb3qjha7tw7gkge&down=async" async></script><noscript><a href="https://www.freecounterstat.com" title="page counter"><img src="https://counter1.optistats.ovh/private/freecounterstat.php?c=94uk4l89zs1gnmzq8zb3qjha7tw7gkge" border="0" title="page counter" alt="page counter"></a></noscript>
+    
     <!-- Action Buttons (Bottom Right) -->
     <div class="fixed bottom-24 right-4 z-[999] flex flex-col gap-3">
         <button onclick="locateUser()" class="bg-white text-gray-700 w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 focus:outline-none">
@@ -174,117 +174,117 @@
                 <input type="hidden" id="lat-input">
                 <input type="hidden" id="lng-input">
 
-                <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl shadow-md transition duration-200">
+                <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl shadow-md transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
                     ยืนยันข้อมูล
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- View Detail Modal (Simplified Popup logic handles most, but this is for clearer view) -->
-    <!-- We will use Leaflet Popups for details to keep it simple -->
-
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <script>
-        // --- 1. State Management ---
+    <!-- Firebase Logic -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, onSnapshot, query } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // --- State Management ---
         let map;
         let userMarker;
         let isAddMode = false;
         let tempMarker = null;
-        let aedData = [];
+        let markersLayer = L.layerGroup(); // Group for managing all AED markers
 
-        // Mock Data (Initial Data)
-        const initialData = [
-            { id: 1, name: "Siam Paragon", detail: "ชั้น G เคาน์เตอร์ประชาสัมพันธ์ ฝั่ง North", lat: 13.7469, lng: 100.5349, access: "public" },
-            { id: 2, name: "Central World", detail: "ชั้น 1 โซน Atrium ใกล้ลิฟต์", lat: 13.7466, lng: 100.5393, access: "public" },
-            { id: 3, name: "MBK Center", detail: "ห้องพยาบาล ชั้น G", lat: 13.7444, lng: 100.5299, access: "restricted" }
-        ];
+        // --- Global Function Exports (Connect Module to HTML) ---
+        window.locateUser = locateUser;
+        window.toggleAddMode = toggleAddMode;
+        window.cancelAddMode = cancelAddMode;
+        window.closeModal = closeModal;
+        window.saveAED = saveAED;
 
-        // --- 2. Initialization ---
-        window.onload = function() {
+        // --- Initialization ---
+        window.onload = async function() {
             initMap();
-            loadAEDs();
+            await initAuth();
         };
 
         function initMap() {
-            // Initialize map centered on Bangkok (default)
             map = L.map('map', { zoomControl: false }).setView([13.7563, 100.5018], 13);
 
-            // Add OpenStreetMap tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
-            // Relocate Zoom Control
             L.control.zoom({ position: 'bottomright' }).addTo(map);
+            
+            // Add layer for markers
+            markersLayer.addTo(map);
 
-            // Add Click Handler for "Add Mode"
+            // Click listener for adding points
             map.on('click', onMapClick);
-
-            // Get User Location
+            
+            // Initial user location
             locateUser();
         }
 
-        function locateUser() {
-            const loading = document.getElementById('loading');
-            
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        
-                        // Set map view
-                        map.setView([latitude, longitude], 16);
+        async function initAuth() {
+            try {
+                // Check for custom token (Priority)
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                    console.log("Connected to Firebase via Custom Token");
+                } else {
+                    // Fallback to anonymous
+                    await signInAnonymously(auth);
+                    console.log("Connected to Firebase via Anonymous Auth");
+                }
+                
+                // Update loading text
+                document.getElementById('loading-text').innerText = 'กำลังโหลดข้อมูล AED ทั่วไทย...';
 
-                        // Remove old user marker if exists
-                        if (userMarker) map.removeLayer(userMarker);
+                // Setup Realtime Listener
+                setupDataListener();
 
-                        // Custom Pulse Icon for User
-                        const userIcon = L.divIcon({
-                            className: 'user-pin',
-                            iconSize: [20, 20],
-                            iconAnchor: [10, 10]
-                        });
-
-                        userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map)
-                            .bindPopup("<b>คุณอยู่ที่นี่</b>").openPopup();
-
-                        loading.style.opacity = '0';
-                        setTimeout(() => loading.style.display = 'none', 500);
-                    },
-                    (error) => {
-                        console.error("Geolocation denied or error:", error);
-                        loading.style.opacity = '0';
-                        setTimeout(() => loading.style.display = 'none', 500);
-                        alert("ไม่สามารถระบุตำแหน่งของคุณได้ กรุณาเปิด GPS");
-                    }
-                );
-            } else {
-                loading.style.display = 'none';
-                alert("Browser ของคุณไม่รองรับ Geolocation");
+            } catch (error) {
+                console.error("Auth Error:", error);
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: " + error.message);
+                document.getElementById('loading').style.display = 'none';
             }
         }
 
-        // --- 3. Data Handling ---
-        function loadAEDs() {
-            // Try to get data from LocalStorage
-            const storedData = localStorage.getItem('aed_locations');
+        function setupDataListener() {
+            // Listen to 'aed_locations' collection
+            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'));
             
-            if (storedData) {
-                aedData = JSON.parse(storedData);
-            } else {
-                // First time load: Use mock data and save it
-                aedData = initialData;
-                localStorage.setItem('aed_locations', JSON.stringify(aedData));
-            }
-            
-            renderMarkers();
+            onSnapshot(q, (snapshot) => {
+                const aedData = [];
+                snapshot.forEach((doc) => {
+                    aedData.push({ id: doc.id, ...doc.data() });
+                });
+                
+                renderMarkers(aedData);
+                
+                // Hide loading screen once data is loaded
+                const loading = document.getElementById('loading');
+                loading.style.opacity = '0';
+                setTimeout(() => loading.style.display = 'none', 500);
+            }, (error) => {
+                console.error("Data Load Error:", error);
+            });
         }
 
-        function renderMarkers() {
-            // Custom Icon Factory
+        function renderMarkers(data) {
+            markersLayer.clearLayers(); // Clear old markers to avoid duplicates
+
             const createAedIcon = () => L.divIcon({
                 className: 'custom-div-icon',
                 html: `<div class='aed-marker-icon'><i class='fa-solid fa-heart-pulse'></i></div>`,
@@ -293,10 +293,9 @@
                 popupAnchor: [0, -20]
             });
 
-            aedData.forEach(point => {
-                const marker = L.marker([point.lat, point.lng], { icon: createAedIcon() }).addTo(map);
+            data.forEach(point => {
+                const marker = L.marker([point.lat, point.lng], { icon: createAedIcon() });
                 
-                // Info Popup Content
                 const popupContent = `
                     <div class="p-4 font-kanit">
                         <div class="flex items-center gap-2 mb-2">
@@ -316,10 +315,38 @@
                 `;
                 
                 marker.bindPopup(popupContent, { className: 'custom-popup' });
+                markersLayer.addLayer(marker);
             });
         }
 
-        // --- 4. Adding New Locations ---
+        function locateUser() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        map.setView([latitude, longitude], 16);
+
+                        if (userMarker) map.removeLayer(userMarker);
+
+                        const userIcon = L.divIcon({
+                            className: 'user-pin',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        });
+
+                        userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map)
+                            .bindPopup("<b>คุณอยู่ที่นี่</b>").openPopup();
+                    },
+                    (error) => {
+                        console.error("GPS Error:", error);
+                        // Don't show alert loop if user denies
+                    }
+                );
+            }
+        }
+
+        // --- Interaction Logic ---
+
         function toggleAddMode() {
             isAddMode = !isAddMode;
             const instruction = document.getElementById('add-instruction');
@@ -345,16 +372,11 @@
 
         function onMapClick(e) {
             if (!isAddMode) return;
-
             const { lat, lng } = e.latlng;
 
-            // Remove previous temp marker if any
             if (tempMarker) map.removeLayer(tempMarker);
-
-            // Add temporary marker
             tempMarker = L.marker([lat, lng]).addTo(map);
 
-            // Open Modal
             document.getElementById('lat-input').value = lat;
             document.getElementById('lng-input').value = lng;
             document.getElementById('add-modal').classList.remove('hidden');
@@ -362,16 +384,13 @@
 
         function closeModal() {
             document.getElementById('add-modal').classList.add('hidden');
-            // Don't cancel add mode immediately to allow re-picking, 
-            // but for better UX usually we reset or keep pin. 
-            // Here let's remove temp marker if user cancels form.
             if(tempMarker) {
                 map.removeLayer(tempMarker);
                 tempMarker = null;
             }
         }
 
-        function saveAED(e) {
+        async function saveAED(e) {
             e.preventDefault();
 
             const name = document.getElementById('location-name').value;
@@ -380,30 +399,37 @@
             const lat = parseFloat(document.getElementById('lat-input').value);
             const lng = parseFloat(document.getElementById('lng-input').value);
 
-            const newPoint = {
-                id: Date.now(),
-                name,
-                detail,
-                lat,
-                lng,
-                access
-            };
+            // UI Loading State
+            const submitBtn = document.querySelector('#aed-form button[type="submit"]');
+            const originalText = submitBtn.innerText;
+            submitBtn.innerText = 'กำลังบันทึกข้อมูล...';
+            submitBtn.disabled = true;
 
-            // Save to array and LocalStorage
-            aedData.push(newPoint);
-            localStorage.setItem('aed_locations', JSON.stringify(aedData));
+            try {
+                // Save to Firestore
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'), {
+                    name,
+                    detail,
+                    lat,
+                    lng,
+                    access,
+                    timestamp: Date.now(), // Useful for sorting or admin review later
+                    verified: false // Placeholder for future admin features
+                });
 
-            // Refresh Map
-            if(tempMarker) map.removeLayer(tempMarker); // Remove temp
-            renderMarkers(); // Re-render all (inefficient for huge data but fine for prototype)
+                // Success
+                document.getElementById('aed-form').reset();
+                closeModal();
+                cancelAddMode();
+                alert('ขอบคุณ! ข้อมูล AED ถูกบันทึกและแชร์ให้ทุกคนเห็นแล้ว');
 
-            // Reset UI
-            document.getElementById('aed-form').reset();
-            closeModal();
-            cancelAddMode();
-            
-            // Show simple success feedback
-            alert('เพิ่มข้อมูล AED เรียบร้อยแล้ว ขอบคุณที่ร่วมช่วยสังคม!');
+            } catch (error) {
+                console.error("Save Error:", error);
+                alert("เกิดข้อผิดพลาด: ไม่สามารถบันทึกข้อมูลได้");
+            } finally {
+                submitBtn.innerText = originalText;
+                submitBtn.disabled = false;
+            }
         }
     </script>
 </body>
