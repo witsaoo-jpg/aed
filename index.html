@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AED Map Thailand - แผนที่จุดติดตั้งเครื่องกระตุกหัวใจ</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts (Kanit) -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            overflow: hidden; /* Prevent scrolling on mobile */
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+            z-index: 1;
+        }
+        .custom-popup .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            padding: 0;
+            overflow: hidden;
+        }
+        .custom-popup .leaflet-popup-content {
+            margin: 0;
+            width: 280px !important;
+        }
+        
+        /* Pulse Animation for User Location */
+        .user-pin {
+            background-color: #3b82f6;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 0 rgba(59, 130, 246, 0.4);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
+        /* AED Marker Style */
+        .aed-marker-icon {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            border: 2px solid #ef4444;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            font-size: 18px;
+            color: #ef4444;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: white;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            transition: opacity 0.5s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 relative">
+
+    <!-- Loading Screen -->
+    <div id="loading">
+        <div class="text-red-500 text-5xl mb-4"><i class="fa-solid fa-heart-pulse fa-beat"></i></div>
+        <h1 class="text-2xl font-bold text-gray-800">AED Map Thailand</h1>
+        <p class="text-gray-500 mb-8">กำลังค้นหาตำแหน่งของคุณ...</p>
+        
+        <!-- Credit on Loading Screen -->
+        <div class="absolute bottom-10 text-center">
+            <p class="text-xs text-gray-400">พัฒนาโดย</p>
+            <p class="text-sm font-semibold text-gray-600">พว.วิษณุกรณ์ โอยา</p>
+        </div>
+    </div>
+
+    <!-- Header / Emergency Bar -->
+    <div class="fixed top-0 left-0 right-0 z-[1000] bg-white shadow-md px-4 py-3 flex justify-between items-center rounded-b-xl">
+        <div class="flex items-center gap-2">
+            <div class="bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center">
+                <i class="fa-solid fa-heart-pulse"></i>
+            </div>
+            <h1 class="font-bold text-gray-800 text-lg">AED Map</h1>
+        </div>
+        <a href="tel:1669" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2 animate-pulse">
+            <i class="fa-solid fa-phone"></i> 1669
+        </a>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Credit Overlay (Always visible bottom-left) -->
+    <div class="fixed bottom-1 left-2 z-[400] pointer-events-none">
+        <p class="text-[10px] text-gray-500 bg-white/80 px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm border border-gray-100">
+            Dev by พว.วิษณุกรณ์ โอยา
+        </p>
+    </div>
+<div id="sfc94uk4l89zs1gnmzq8zb3qjha7tw7gkge"></div><script type="text/javascript" src="https://counter1.optistats.ovh/private/counter.js?c=94uk4l89zs1gnmzq8zb3qjha7tw7gkge&down=async" async></script><noscript><a href="https://www.freecounterstat.com" title="page counter"><img src="https://counter1.optistats.ovh/private/freecounterstat.php?c=94uk4l89zs1gnmzq8zb3qjha7tw7gkge" border="0" title="page counter" alt="page counter"></a></noscript>
+    <!-- Action Buttons (Bottom Right) -->
+    <div class="fixed bottom-24 right-4 z-[999] flex flex-col gap-3">
+        <button onclick="locateUser()" class="bg-white text-gray-700 w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 focus:outline-none">
+            <i class="fa-solid fa-crosshairs text-xl"></i>
+        </button>
+    </div>
+
+    <!-- Add Button (Main FAB) -->
+    <div class="fixed bottom-6 left-0 right-0 z-[1000] flex justify-center pointer-events-none">
+        <button onclick="toggleAddMode()" class="pointer-events-auto bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-xl font-bold flex items-center gap-2 transform transition hover:scale-105">
+            <i class="fa-solid fa-plus"></i> แจ้งจุดติดตั้ง AED
+        </button>
+    </div>
+
+    <!-- Add Location Instruction Overlay (Hidden by default) -->
+    <div id="add-instruction" class="hidden fixed top-24 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg z-[1001] text-sm text-center w-max">
+        <i class="fa-solid fa-location-dot text-red-400 mr-1"></i> แตะบนแผนที่เพื่อปักหมุด
+        <button onclick="cancelAddMode()" class="ml-3 text-gray-300 hover:text-white underline">ยกเลิก</button>
+    </div>
+
+    <!-- Modal Form for Adding AED -->
+    <div id="add-modal" class="hidden fixed inset-0 z-[2000] bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 slide-up-animation">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-map-pin text-red-500 mr-2"></i>เพิ่มจุด AED</h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="aed-form" onsubmit="saveAED(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">สถานที่ (ชื่อตึก/สถานที่)</label>
+                    <input type="text" id="location-name" required placeholder="เช่น เซ็นทรัลเวิลด์, BTS สยาม" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-red-500 bg-gray-50">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">รายละเอียดตำแหน่ง (ชั้น/จุดสังเกต)</label>
+                    <textarea id="location-detail" required rows="2" placeholder="เช่น ชั้น 1 หน้าลิฟต์แก้ว, ห้องพยาบาล" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-red-500 bg-gray-50"></textarea>
+                </div>
+
+                <div class="mb-4">
+                     <label class="block text-gray-700 text-sm font-bold mb-2">ประเภทการเข้าถึง</label>
+                     <div class="flex gap-2">
+                        <label class="flex items-center gap-2 border p-2 rounded-lg cursor-pointer hover:bg-gray-50 w-1/2">
+                            <input type="radio" name="access" value="public" checked class="accent-green-500">
+                            <span class="text-sm">สาธารณะ</span>
+                        </label>
+                        <label class="flex items-center gap-2 border p-2 rounded-lg cursor-pointer hover:bg-gray-50 w-1/2">
+                            <input type="radio" name="access" value="restricted" class="accent-orange-500">
+                            <span class="text-sm">จำกัดเวลา/คน</span>
+                        </label>
+                     </div>
+                </div>
+
+                <input type="hidden" id="lat-input">
+                <input type="hidden" id="lng-input">
+
+                <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl shadow-md transition duration-200">
+                    ยืนยันข้อมูล
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Detail Modal (Simplified Popup logic handles most, but this is for clearer view) -->
+    <!-- We will use Leaflet Popups for details to keep it simple -->
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        // --- 1. State Management ---
+        let map;
+        let userMarker;
+        let isAddMode = false;
+        let tempMarker = null;
+        let aedData = [];
+
+        // Mock Data (Initial Data)
+        const initialData = [
+            { id: 1, name: "Siam Paragon", detail: "ชั้น G เคาน์เตอร์ประชาสัมพันธ์ ฝั่ง North", lat: 13.7469, lng: 100.5349, access: "public" },
+            { id: 2, name: "Central World", detail: "ชั้น 1 โซน Atrium ใกล้ลิฟต์", lat: 13.7466, lng: 100.5393, access: "public" },
+            { id: 3, name: "MBK Center", detail: "ห้องพยาบาล ชั้น G", lat: 13.7444, lng: 100.5299, access: "restricted" }
+        ];
+
+        // --- 2. Initialization ---
+        window.onload = function() {
+            initMap();
+            loadAEDs();
+        };
+
+        function initMap() {
+            // Initialize map centered on Bangkok (default)
+            map = L.map('map', { zoomControl: false }).setView([13.7563, 100.5018], 13);
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Relocate Zoom Control
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // Add Click Handler for "Add Mode"
+            map.on('click', onMapClick);
+
+            // Get User Location
+            locateUser();
+        }
+
+        function locateUser() {
+            const loading = document.getElementById('loading');
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        
+                        // Set map view
+                        map.setView([latitude, longitude], 16);
+
+                        // Remove old user marker if exists
+                        if (userMarker) map.removeLayer(userMarker);
+
+                        // Custom Pulse Icon for User
+                        const userIcon = L.divIcon({
+                            className: 'user-pin',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        });
+
+                        userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map)
+                            .bindPopup("<b>คุณอยู่ที่นี่</b>").openPopup();
+
+                        loading.style.opacity = '0';
+                        setTimeout(() => loading.style.display = 'none', 500);
+                    },
+                    (error) => {
+                        console.error("Geolocation denied or error:", error);
+                        loading.style.opacity = '0';
+                        setTimeout(() => loading.style.display = 'none', 500);
+                        alert("ไม่สามารถระบุตำแหน่งของคุณได้ กรุณาเปิด GPS");
+                    }
+                );
+            } else {
+                loading.style.display = 'none';
+                alert("Browser ของคุณไม่รองรับ Geolocation");
+            }
+        }
+
+        // --- 3. Data Handling ---
+        function loadAEDs() {
+            // Try to get data from LocalStorage
+            const storedData = localStorage.getItem('aed_locations');
+            
+            if (storedData) {
+                aedData = JSON.parse(storedData);
+            } else {
+                // First time load: Use mock data and save it
+                aedData = initialData;
+                localStorage.setItem('aed_locations', JSON.stringify(aedData));
+            }
+            
+            renderMarkers();
+        }
+
+        function renderMarkers() {
+            // Custom Icon Factory
+            const createAedIcon = () => L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class='aed-marker-icon'><i class='fa-solid fa-heart-pulse'></i></div>`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+                popupAnchor: [0, -20]
+            });
+
+            aedData.forEach(point => {
+                const marker = L.marker([point.lat, point.lng], { icon: createAedIcon() }).addTo(map);
+                
+                // Info Popup Content
+                const popupContent = `
+                    <div class="p-4 font-kanit">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="bg-red-100 text-red-600 p-2 rounded-full text-xs">
+                                <i class="fa-solid fa-bolt"></i> AED
+                            </span>
+                            <span class="text-xs text-gray-500 border px-2 py-1 rounded">${point.access === 'public' ? 'สาธารณะ' : 'จำกัดเวลา'}</span>
+                        </div>
+                        <h3 class="font-bold text-lg text-gray-800 leading-tight mb-1">${point.name}</h3>
+                        <p class="text-gray-600 text-sm mb-3"><i class="fa-solid fa-location-dot text-gray-400"></i> ${point.detail}</p>
+                        
+                        <a href="https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}" target="_blank" 
+                           class="block w-full text-center bg-blue-500 text-white py-2 rounded-lg text-sm font-bold hover:bg-blue-600">
+                           <i class="fa-solid fa-diamond-turn-right"></i> นำทาง
+                        </a>
+                    </div>
+                `;
+                
+                marker.bindPopup(popupContent, { className: 'custom-popup' });
+            });
+        }
+
+        // --- 4. Adding New Locations ---
+        function toggleAddMode() {
+            isAddMode = !isAddMode;
+            const instruction = document.getElementById('add-instruction');
+            const mapContainer = document.getElementById('map');
+            
+            if (isAddMode) {
+                instruction.classList.remove('hidden');
+                mapContainer.style.cursor = 'crosshair';
+            } else {
+                cancelAddMode();
+            }
+        }
+
+        function cancelAddMode() {
+            isAddMode = false;
+            document.getElementById('add-instruction').classList.add('hidden');
+            document.getElementById('map').style.cursor = '';
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+        }
+
+        function onMapClick(e) {
+            if (!isAddMode) return;
+
+            const { lat, lng } = e.latlng;
+
+            // Remove previous temp marker if any
+            if (tempMarker) map.removeLayer(tempMarker);
+
+            // Add temporary marker
+            tempMarker = L.marker([lat, lng]).addTo(map);
+
+            // Open Modal
+            document.getElementById('lat-input').value = lat;
+            document.getElementById('lng-input').value = lng;
+            document.getElementById('add-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('add-modal').classList.add('hidden');
+            // Don't cancel add mode immediately to allow re-picking, 
+            // but for better UX usually we reset or keep pin. 
+            // Here let's remove temp marker if user cancels form.
+            if(tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+        }
+
+        function saveAED(e) {
+            e.preventDefault();
+
+            const name = document.getElementById('location-name').value;
+            const detail = document.getElementById('location-detail').value;
+            const access = document.querySelector('input[name="access"]:checked').value;
+            const lat = parseFloat(document.getElementById('lat-input').value);
+            const lng = parseFloat(document.getElementById('lng-input').value);
+
+            const newPoint = {
+                id: Date.now(),
+                name,
+                detail,
+                lat,
+                lng,
+                access
+            };
+
+            // Save to array and LocalStorage
+            aedData.push(newPoint);
+            localStorage.setItem('aed_locations', JSON.stringify(aedData));
+
+            // Refresh Map
+            if(tempMarker) map.removeLayer(tempMarker); // Remove temp
+            renderMarkers(); // Re-render all (inefficient for huge data but fine for prototype)
+
+            // Reset UI
+            document.getElementById('aed-form').reset();
+            closeModal();
+            cancelAddMode();
+            
+            // Show simple success feedback
+            alert('เพิ่มข้อมูล AED เรียบร้อยแล้ว ขอบคุณที่ร่วมช่วยสังคม!');
+        }
+    </script>
+</body>
+</html>
