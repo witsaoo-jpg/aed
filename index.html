@@ -207,9 +207,10 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-        // --- Config Section ---
-        // ใส่โค้ด Firebase ของคุณที่นี่
-        let firebaseConfig = {
+        // ===============================================
+        // ส่วนการตั้งค่า Firebase (ใช้ค่าของคุณ 100%)
+        // ===============================================
+        const firebaseConfig = {
           apiKey: "AIzaSyDp0HC7Wh2fH13XbMXrzvrFSQpB3q0breI",
           authDomain: "aed-map-th-488a6.firebaseapp.com",
           projectId: "aed-map-th-488a6",
@@ -218,16 +219,10 @@
           appId: "1:264816215714:web:92494e9281eed1f7e5f9fb"
         };
         
-        let appId = 'aed-map-th-488a6'; // ใช้ Project ID เป็น App ID เพื่อความสะดวก
+        // ใช้ชื่อ Project ID เป็นชื่อแอป เพื่อความชัวร์เรื่องสิทธิ์
+        const appId = 'aed-map-th-488a6';
 
-        // โค้ดสำรองสำหรับ Preview (ถ้าคุณใช้ในเว็บนี้ มันอาจจะยังพยายามใช้ Config ของระบบ)
-        // แต่ถ้าเอาไปรันข้างนอก โค้ดด้านบนจะทำงาน 100%
-        if (typeof __firebase_config !== 'undefined' && (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ใส่ค่าของคุณ"))) {
-            console.log("Using Preview Environment Config");
-            firebaseConfig = JSON.parse(__firebase_config);
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        }
-
+        // เริ่มต้นการทำงาน Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -275,17 +270,25 @@
 
         async function initAuth() {
             try {
+                // ติดตามสถานะ Login
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         console.log("Authenticated User:", user.uid);
                         currentUser = user;
                         document.getElementById('loading-text').innerText = 'กำลังโหลดตำแหน่ง AED...';
                         setupDataListener(); 
+                    } else {
+                        // ถ้าหลุด ให้หยุดฟังข้อมูล
+                        if(unsubscribeData) unsubscribeData();
                     }
                 });
 
+                // ตรวจสอบสถานะและทำการ Login
                 if (!auth.currentUser) {
-                    await performSignIn();
+                    console.log("Starting Anonymous Auth...");
+                    await signInAnonymously(auth);
+                } else {
+                    console.log("User already logged in");
                 }
 
             } catch (error) {
@@ -293,18 +296,6 @@
                 document.getElementById('loading-text').innerText = 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
                 document.getElementById('error-message').innerText = error.message;
                 document.getElementById('error-container').classList.remove('hidden');
-            }
-        }
-
-        async function performSignIn() {
-            // ถ้าอยู่ใน Preview Environment ใช้ Custom Token
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token && (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ใส่ค่าของคุณ"))) {
-                console.log("Signing in with custom token...");
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                // ถ้าใช้ Config ของคุณเอง ให้ใช้ Anonymous Auth
-                console.log("Signing in anonymously...");
-                await signInAnonymously(auth);
             }
         }
 
@@ -323,8 +314,9 @@
                     aedData.push({ id: doc.id, ...doc.data() });
                 });
                 renderMarkers(aedData);
-                retryCount = 0;
                 
+                // โหลดเสร็จแล้ว -> รีเซ็ตตัวนับ -> ปิดหน้า Loading
+                retryCount = 0;
                 const loading = document.getElementById('loading');
                 if (loading) {
                     loading.style.opacity = '0';
@@ -334,14 +326,19 @@
                 console.error("Data Load Error:", error);
                 
                 if (error.code === 'permission-denied') {
+                    // *** Auto-Recovery Logic ***
+                    // ถ้าโดนปฏิเสธสิทธิ์ ให้ลอง Sign Out แล้วเข้าใหม่ 1 ครั้ง (เผื่อ Token เก่าค้าง)
                     if (retryCount < 1) {
                         retryCount++;
-                        console.warn("Permission denied. Attempting to refresh session...");
+                        console.warn("Permission denied. Trying to refresh session...");
                         document.getElementById('loading-text').innerText = 'กำลังรีเซ็ตการเชื่อมต่อ...';
-                        signOut(auth).then(() => performSignIn());
+                        
+                        signOut(auth).then(() => {
+                            return signInAnonymously(auth);
+                        }).catch(e => console.error("Retry failed:", e));
                     } else {
                         document.getElementById('loading-text').innerText = 'สิทธิ์การเข้าถึงถูกปฏิเสธ';
-                        document.getElementById('error-message').innerText = 'ไม่สามารถเข้าถึงข้อมูลได้ กรุณาตรวจสอบ Security Rules ใน Firebase Console';
+                        document.getElementById('error-message').innerText = 'กรุณากดโหลดใหม่ หรือตรวจสอบการตั้งค่า Firebase';
                         document.getElementById('error-container').classList.remove('hidden');
                     }
                 }
@@ -506,3 +503,5 @@
     </script>
 </body>
 </html>
+
+
