@@ -86,11 +86,11 @@
     <div id="loading" class="px-4 text-center">
         <div class="text-red-500 text-6xl mb-4"><i class="fa-solid fa-heart-pulse fa-beat"></i></div>
         <h1 class="text-2xl font-bold text-gray-800">AED Map Thailand</h1>
-        <p id="loading-text" class="text-gray-500 mb-4 mt-2">กำลังรีเซ็ตการเชื่อมต่อ...</p>
+        <p id="loading-text" class="text-gray-500 mb-4 mt-2">กำลังเชื่อมต่อฐานข้อมูล...</p>
         
         <!-- Error Message / Retry Button -->
         <div id="error-container" class="hidden mt-2">
-            <p id="error-message" class="text-red-500 text-sm mb-3">การเชื่อมต่อล่าช้ากว่าปกติ</p>
+            <p id="error-message" class="text-red-500 text-sm mb-3">การเชื่อมต่อมีปัญหา</p>
             <button onclick="window.location.reload()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700">
                 <i class="fa-solid fa-rotate-right mr-1"></i> โหลดใหม่
             </button>
@@ -232,6 +232,7 @@
         let markersLayer = L.layerGroup();
         let currentUser = null;
         let unsubscribeData = null;
+        let retryCount = 0; // ตัวนับจำนวนครั้งที่ลองเชื่อมต่อใหม่
 
         window.locateUser = locateUser;
         window.toggleAddMode = toggleAddMode;
@@ -247,7 +248,7 @@
                     document.getElementById('loading-text').innerText = 'การเชื่อมต่อใช้เวลานานกว่าปกติ...';
                     document.getElementById('error-container').classList.remove('hidden');
                 }
-            }, 10000);
+            }, 15000);
 
             initMap();
             await initAuth();
@@ -266,7 +267,6 @@
 
         async function initAuth() {
             try {
-                // 1. รอฟังสถานะ Login
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         console.log("Authenticated User:", user.uid);
@@ -274,26 +274,14 @@
                         document.getElementById('loading-text').innerText = 'กำลังโหลดตำแหน่ง AED...';
                         setupDataListener(); 
                     } else {
-                        // ถ้าหลุด ให้หยุดฟังข้อมูล
-                        if(unsubscribeData) unsubscribeData();
+                        // User logged out
                     }
                 });
 
-                // 2. ตรวจสอบ Token และจัดการ Login/Logout เพื่อล้างค่าเก่า
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    // ถ้ามี Token ใหม่มา ให้ SignOut ของเก่าออกก่อน เพื่อกัน Permission Error
-                    if (auth.currentUser) {
-                        console.log("Found existing session, signing out to refresh...");
-                        await signOut(auth);
-                    }
-                    console.log("Signing in with custom token...");
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    // กรณีไม่มี Token พิเศษ
-                    if (!auth.currentUser) {
-                        console.log("Signing in anonymously...");
-                        await signInAnonymously(auth);
-                    }
+                // Start Authentication Process
+                // ไม่บังคับ SignOut แต่แรก แต่จะ SignOut ก็ต่อเมื่อเจอ Permission Denied
+                if (!auth.currentUser) {
+                    await performSignIn();
                 }
 
             } catch (error) {
@@ -301,6 +289,16 @@
                 document.getElementById('loading-text').innerText = 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
                 document.getElementById('error-message').innerText = error.message;
                 document.getElementById('error-container').classList.remove('hidden');
+            }
+        }
+
+        async function performSignIn() {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                console.log("Signing in with custom token...");
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                console.log("Signing in anonymously...");
+                await signInAnonymously(auth);
             }
         }
 
@@ -320,6 +318,9 @@
                 });
                 renderMarkers(aedData);
                 
+                // Success - Reset retry count
+                retryCount = 0;
+                
                 const loading = document.getElementById('loading');
                 if (loading) {
                     loading.style.opacity = '0';
@@ -329,12 +330,23 @@
                 console.error("Data Load Error:", error);
                 
                 if (error.code === 'permission-denied') {
-                     document.getElementById('loading-text').innerText = 'สิทธิ์การเข้าถึงถูกปฏิเสธ';
-                     document.getElementById('error-message').innerText = 'ระบบกำลังลองเชื่อมต่อใหม่ กรุณารอสักครู่...';
-                     document.getElementById('error-container').classList.remove('hidden');
-                     
-                     // ลองแก้ปัญหาโดยการ SignOut แล้วเข้าใหม่ (User จะต้องกด Refresh เองถ้ายังไม่หาย)
-                     // signOut(auth); 
+                    // *** Auto-Fix Logic ***
+                    if (retryCount < 1) {
+                        retryCount++;
+                        console.warn("Permission denied. Attempting to refresh session (SignOut & SignIn)...");
+                        document.getElementById('loading-text').innerText = 'กำลังรีเซ็ตการเชื่อมต่อ...';
+                        
+                        // Force Sign Out and then Re-Sign In
+                        signOut(auth).then(() => {
+                            return performSignIn();
+                        }).catch(e => console.error("Retry failed:", e));
+                        
+                    } else {
+                        // ถ้าลองแล้วยังไม่ได้ ให้แจ้ง User
+                        document.getElementById('loading-text').innerText = 'สิทธิ์การเข้าถึงถูกปฏิเสธ';
+                        document.getElementById('error-message').innerText = 'ไม่สามารถเข้าถึงข้อมูลได้ กรุณากดโหลดใหม่';
+                        document.getElementById('error-container').classList.remove('hidden');
+                    }
                 }
             });
         }
