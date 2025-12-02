@@ -20,14 +20,13 @@
     <style>
         body {
             font-family: 'Kanit', sans-serif;
-            overflow: hidden; /* ป้องกันการเลื่อนหน้าจอบนมือถือ */
+            overflow: hidden;
         }
         #map {
             height: 100vh;
             width: 100%;
             z-index: 1;
         }
-        /* ปรับแต่ง Popup ของแผนที่ */
         .custom-popup .leaflet-popup-content-wrapper {
             border-radius: 12px;
             padding: 0;
@@ -41,8 +40,6 @@
         .custom-popup .leaflet-popup-tip {
             background: white;
         }
-        
-        /* Pulse Animation for User Location */
         .user-pin {
             background-color: #3b82f6;
             border: 3px solid white;
@@ -55,8 +52,6 @@
             70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
             100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
-
-        /* AED Marker Style */
         .aed-marker-icon {
             display: flex;
             justify-content: center;
@@ -72,8 +67,6 @@
         .aed-marker-icon:hover {
             transform: scale(1.1);
         }
-
-        /* Loading Overlay */
         #loading {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -85,27 +78,25 @@
             flex-direction: column;
             transition: opacity 0.5s ease;
         }
-        
-        /* Slide Up Animation for Modal */
-        @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .slide-up-animation {
-            animation: slideUp 0.3s ease-out forwards;
-        }
     </style>
 </head>
 <body class="bg-gray-100 relative">
 
     <!-- Loading Screen -->
-    <div id="loading">
+    <div id="loading" class="px-4 text-center">
         <div class="text-red-500 text-6xl mb-4"><i class="fa-solid fa-heart-pulse fa-beat"></i></div>
         <h1 class="text-2xl font-bold text-gray-800">AED Map Thailand</h1>
-        <p id="loading-text" class="text-gray-500 mb-8 mt-2">กำลังเชื่อมต่อฐานข้อมูล...</p>
+        <p id="loading-text" class="text-gray-500 mb-4 mt-2">กำลังรีเซ็ตการเชื่อมต่อ...</p>
         
-        <!-- Credits -->
-        <div class="absolute bottom-10 text-center">
+        <!-- Error Message / Retry Button -->
+        <div id="error-container" class="hidden mt-2">
+            <p id="error-message" class="text-red-500 text-sm mb-3">การเชื่อมต่อล่าช้ากว่าปกติ</p>
+            <button onclick="window.location.reload()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700">
+                <i class="fa-solid fa-rotate-right mr-1"></i> โหลดใหม่
+            </button>
+        </div>
+
+        <div class="absolute bottom-10 text-center left-0 right-0">
             <p class="text-xs text-gray-400">พัฒนาโดย</p>
             <p class="text-sm font-semibold text-gray-600">พว.วิษณุกรณ์ โอยา</p>
         </div>
@@ -130,28 +121,28 @@
     <!-- Map Container -->
     <div id="map"></div>
 
-    <!-- Persistent Credit Overlay -->
+    <!-- Credit Overlay -->
     <div class="fixed bottom-1 left-2 z-[400] pointer-events-none select-none">
         <p class="text-[10px] text-gray-500 bg-white/80 px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm border border-gray-100">
             Dev by พว.วิษณุกรณ์ โอยา
         </p>
     </div>
     
-    <!-- Action Buttons (Bottom Right) -->
+    <!-- Action Buttons -->
     <div class="fixed bottom-24 right-4 z-[999] flex flex-col gap-3">
         <button onclick="locateUser()" class="bg-white text-gray-700 w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 active:scale-95 transition-all focus:outline-none border border-gray-100" title="ตำแหน่งของฉัน">
             <i class="fa-solid fa-crosshairs text-xl text-blue-500"></i>
         </button>
     </div>
 
-    <!-- Add Button (Main FAB) -->
+    <!-- Add Button -->
     <div class="fixed bottom-6 left-0 right-0 z-[1000] flex justify-center pointer-events-none">
         <button onclick="toggleAddMode()" class="pointer-events-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3.5 rounded-full shadow-xl shadow-green-200 font-bold flex items-center gap-2 transform transition hover:scale-105 active:scale-95">
             <i class="fa-solid fa-plus text-lg"></i> แจ้งจุดติดตั้ง AED
         </button>
     </div>
 
-    <!-- Add Location Instruction Overlay (Hidden by default) -->
+    <!-- Add Instruction -->
     <div id="add-instruction" class="hidden fixed top-28 left-1/2 transform -translate-x-1/2 bg-gray-800/90 text-white px-4 py-2 rounded-full shadow-lg z-[1001] text-sm text-center w-max backdrop-blur-md">
         <span class="flex items-center gap-2">
             <i class="fa-solid fa-location-dot text-red-400"></i> แตะบนแผนที่เพื่อปักหมุด
@@ -160,7 +151,7 @@
         </span>
     </div>
 
-    <!-- Modal Form for Adding AED -->
+    <!-- Modal Form -->
     <div id="add-modal" class="hidden fixed inset-0 z-[2000] bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm transition-all">
         <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 slide-up-animation max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-6">
@@ -208,50 +199,40 @@
         </div>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Script -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-        // ==========================================
-        // ส่วนการตั้งค่า Firebase (Configuration)
-        // ==========================================
-        
-        // 1. สำหรับใช้งานใน Preview (ไม่ต้องแก้ไขถ้าเล่นในเว็บนี้)
-        let firebaseConfig = JSON.parse(__firebase_config);
+        // --- Config Section ---
+        let firebaseConfig;
         let appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        // 2. สำหรับใช้งานจริงบน GitHub Pages (ให้เอา Comment ออกแล้วใส่ค่าของคุณ)
-        /*
-        firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.firebasestorage.app",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-        appId = 'aed-map-thailand'; // หรือชื่ออะไรก็ได้
-        */
+        if (typeof __firebase_config !== 'undefined') {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            document.getElementById('loading-text').innerText = 'ไม่พบการตั้งค่า Firebase';
+            document.getElementById('error-message').innerText = 'Missing Firebase Config';
+            document.getElementById('error-container').classList.remove('hidden');
+            throw new Error("Missing Firebase Config");
+        }
 
-        // เริ่มต้นการทำงาน Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // ตัวแปร Global
+        // Global Variables
         let map;
         let userMarker;
         let isAddMode = false;
         let tempMarker = null;
         let markersLayer = L.layerGroup();
         let currentUser = null;
+        let unsubscribeData = null;
 
-        // Export ฟังก์ชันให้ HTML เรียกใช้ได้
         window.locateUser = locateUser;
         window.toggleAddMode = toggleAddMode;
         window.cancelAddMode = cancelAddMode;
@@ -259,74 +240,86 @@
         window.saveAED = saveAED;
         window.deleteAED = deleteAED;
 
-        // เริ่มทำงานเมื่อโหลดหน้าเว็บ
         window.onload = async function() {
+            setTimeout(() => {
+                const loading = document.getElementById('loading');
+                if (loading && loading.style.display !== 'none' && loading.style.opacity !== '0') {
+                    document.getElementById('loading-text').innerText = 'การเชื่อมต่อใช้เวลานานกว่าปกติ...';
+                    document.getElementById('error-container').classList.remove('hidden');
+                }
+            }, 10000);
+
             initMap();
             await initAuth();
         };
 
-        // --- 1. ระบบแผนที่ ---
         function initMap() {
-            // ตั้งค่าเริ่มต้นที่อนุสาวรีย์ชัยฯ (ศูนย์กลางกทม.)
             map = L.map('map', { zoomControl: false }).setView([13.7649, 100.5383], 13);
-
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors | Dev by พว.วิษณุกรณ์ โอยา'
             }).addTo(map);
-
             L.control.zoom({ position: 'bottomright' }).addTo(map);
             markersLayer.addTo(map);
             map.on('click', onMapClick);
-            
-            // หาตำแหน่งผู้ใช้ทันที
             locateUser();
         }
 
-        // --- 2. ระบบยืนยันตัวตน (Authentication) ---
         async function initAuth() {
             try {
-                // ตรวจสอบว่ามี Token จากระบบ Preview หรือไม่
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                    console.log("Logged in with Custom Token");
-                } else {
-                    // ถ้าไม่มี (เช่นอยู่บน GitHub) ให้เข้าสู่ระบบแบบไม่ระบุตัวตน
-                    await signInAnonymously(auth);
-                    console.log("Logged in Anonymously");
-                }
-
-                // รอฟังสถานะการล็อกอิน
+                // 1. รอฟังสถานะ Login
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
+                        console.log("Authenticated User:", user.uid);
                         currentUser = user;
                         document.getElementById('loading-text').innerText = 'กำลังโหลดตำแหน่ง AED...';
-                        setupDataListener(); // เริ่มดึงข้อมูลเมื่อล็อกอินสำเร็จ
+                        setupDataListener(); 
                     } else {
-                        console.error("User logged out");
+                        // ถ้าหลุด ให้หยุดฟังข้อมูล
+                        if(unsubscribeData) unsubscribeData();
                     }
                 });
 
+                // 2. ตรวจสอบ Token และจัดการ Login/Logout เพื่อล้างค่าเก่า
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    // ถ้ามี Token ใหม่มา ให้ SignOut ของเก่าออกก่อน เพื่อกัน Permission Error
+                    if (auth.currentUser) {
+                        console.log("Found existing session, signing out to refresh...");
+                        await signOut(auth);
+                    }
+                    console.log("Signing in with custom token...");
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    // กรณีไม่มี Token พิเศษ
+                    if (!auth.currentUser) {
+                        console.log("Signing in anonymously...");
+                        await signInAnonymously(auth);
+                    }
+                }
+
             } catch (error) {
-                console.error("Auth Error:", error);
-                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + error.message);
-                document.getElementById('loading').style.display = 'none';
+                console.error("Auth Init Error:", error);
+                document.getElementById('loading-text').innerText = 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
+                document.getElementById('error-message').innerText = error.message;
+                document.getElementById('error-container').classList.remove('hidden');
             }
         }
 
-        // --- 3. ระบบข้อมูล Real-time (Firestore) ---
         function setupDataListener() {
-            // ดึงข้อมูลจาก Collection
-            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'));
+            if (unsubscribeData) {
+                unsubscribeData();
+            }
+
+            console.log("Listening to path:", `artifacts/${appId}/public/data/aed_locations`);
+            const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations');
+            const q = query(collectionRef);
             
-            onSnapshot(q, (snapshot) => {
+            unsubscribeData = onSnapshot(q, (snapshot) => {
                 const aedData = [];
                 snapshot.forEach((doc) => {
                     aedData.push({ id: doc.id, ...doc.data() });
                 });
-                
                 renderMarkers(aedData);
                 
-                // ปิดหน้า Loading
                 const loading = document.getElementById('loading');
                 if (loading) {
                     loading.style.opacity = '0';
@@ -334,16 +327,20 @@
                 }
             }, (error) => {
                 console.error("Data Load Error:", error);
-                // ถ้า Error เรื่อง Permission ให้แจ้งเตือน แต่ไม่แสดง Alert ถี่ๆ
-                if(error.code === 'permission-denied') {
-                    console.warn("Permission denied: Check Firestore rules.");
+                
+                if (error.code === 'permission-denied') {
+                     document.getElementById('loading-text').innerText = 'สิทธิ์การเข้าถึงถูกปฏิเสธ';
+                     document.getElementById('error-message').innerText = 'ระบบกำลังลองเชื่อมต่อใหม่ กรุณารอสักครู่...';
+                     document.getElementById('error-container').classList.remove('hidden');
+                     
+                     // ลองแก้ปัญหาโดยการ SignOut แล้วเข้าใหม่ (User จะต้องกด Refresh เองถ้ายังไม่หาย)
+                     // signOut(auth); 
                 }
             });
         }
 
         function renderMarkers(data) {
             markersLayer.clearLayers();
-
             const createAedIcon = () => L.divIcon({
                 className: 'custom-div-icon',
                 html: `<div class='aed-marker-icon'><i class='fa-solid fa-heart-pulse'></i></div>`,
@@ -353,14 +350,10 @@
             });
 
             data.forEach(point => {
-                // ป้องกันข้อมูลเสีย (ไม่มี lat/lng)
                 if (!point.lat || !point.lng) return;
-
                 const marker = L.marker([point.lat, point.lng], { icon: createAedIcon() });
                 
-                // ตรวจสอบว่าเป็นเจ้าของจุดหรือไม่ (ถ้าใช่ ให้แสดงปุ่มลบ)
                 const isOwner = currentUser && point.createdBy === currentUser.uid;
-                
                 let deleteButtonHtml = '';
                 if (isOwner) {
                     deleteButtonHtml = `
@@ -382,34 +375,25 @@
                         </div>
                         <h3 class="font-bold text-lg text-gray-800 leading-tight mb-1">${point.name}</h3>
                         <p class="text-gray-600 text-sm mb-4"><i class="fa-solid fa-location-dot text-gray-400 mr-1"></i> ${point.detail}</p>
-                        
                         <a href="https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}" target="_blank" 
                            class="flex items-center justify-center w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm">
                            <i class="fa-solid fa-diamond-turn-right mr-2"></i> นำทาง
                         </a>
-                        
                         ${deleteButtonHtml}
-
                         <div class="mt-2 text-right">
                              <span class="text-[10px] text-gray-300">ID: ${point.id ? point.id.substring(0,4) : 'N/A'}</span>
                         </div>
                     </div>
                 `;
-                
                 marker.bindPopup(popupContent, { className: 'custom-popup' });
                 markersLayer.addLayer(marker);
             });
         }
-        
-        // --- ฟังก์ชันลบข้อมูล (เรียกใช้เมื่อกดปุ่มใน Popup) ---
+
         async function deleteAED(docId) {
-            if(!confirm('คุณแน่ใจหรือไม่ที่จะลบจุด AED นี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
-                return;
-            }
-            
+            if(!confirm('คุณแน่ใจหรือไม่ที่จะลบจุด AED นี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
             try {
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', docId));
-                // ไม่ต้องทำอะไรเพิ่ม เพราะ onSnapshot จะตรวจจับการลบและอัปเดตหน้าจอให้อัตโนมัติ
                 alert('ลบข้อมูลเรียบร้อยแล้ว');
             } catch (error) {
                 console.error("Delete Error:", error);
@@ -417,50 +401,21 @@
             }
         }
 
-        // --- 4. ฟังก์ชันระบุตำแหน่งผู้ใช้ ---
         function locateUser() {
             const btn = document.querySelector('button[title="ตำแหน่งของฉัน"] i');
-            btn.classList.add('fa-spin'); // เพิ่ม animation หมุนๆ
-
+            btn.classList.add('fa-spin');
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const { latitude, longitude } = position.coords;
                         map.setView([latitude, longitude], 16);
-
                         if (userMarker) map.removeLayer(userMarker);
-
-                        const userIcon = L.divIcon({
-                            className: 'user-pin',
-                            iconSize: [24, 24],
-                            iconAnchor: [12, 12]
-                        });
-
-                        userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map)
-                            .bindPopup("<b>คุณอยู่ที่นี่</b>").openPopup();
-                        
+                        const userIcon = L.divIcon({ className: 'user-pin', iconSize: [24, 24], iconAnchor: [12, 12] });
+                        userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map).bindPopup("<b>คุณอยู่ที่นี่</b>").openPopup();
                         btn.classList.remove('fa-spin');
                     },
                     (error) => {
-                        console.error("GPS Error:", error.message || error);
-                        
-                        let msg = "ไม่สามารถระบุตำแหน่งได้";
-                        switch(error.code) {
-                            case error.PERMISSION_DENIED:
-                                msg = "ถูกปฏิเสธการเข้าถึงตำแหน่ง (Permission Denied)";
-                                break;
-                            case error.POSITION_UNAVAILABLE:
-                                msg = "ไม่พบตำแหน่งปัจจุบัน (Position Unavailable)";
-                                break;
-                            case error.TIMEOUT:
-                                msg = "หมดเวลาการค้นหาตำแหน่ง (Timeout)";
-                                break;
-                        }
-                        
-                        // แสดง Alert เฉพาะเมื่อผู้ใช้กดปุ่มเอง ถ้าเป็น auto load ไม่ต้องโวยวาย
-                        // แต่ในที่นี้เราใช้ฟังก์ชันเดียวกัน
-                        alert(msg + " กรุณาตรวจสอบการตั้งค่า GPS");
-                        
+                        console.error("GPS Error:", error);
                         btn.classList.remove('fa-spin');
                     },
                     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -471,19 +426,13 @@
             }
         }
 
-        // --- 5. การเพิ่มจุด AED (Add Mode) ---
         function toggleAddMode() {
-            if (!currentUser) {
-                alert("ระบบกำลังเชื่อมต่อ... กรุณารอสักครู่");
-                return;
-            }
+            if (!currentUser) { alert("ระบบกำลังเชื่อมต่อ... กรุณารอสักครู่"); return; }
             isAddMode = !isAddMode;
             const instruction = document.getElementById('add-instruction');
             const mapContainer = document.getElementById('map');
-            
             if (isAddMode) {
-                instruction.classList.remove('hidden');
-                instruction.classList.add('flex'); // ใช้ flex เพื่อจัดเรียง
+                instruction.classList.remove('hidden'); instruction.classList.add('flex');
                 mapContainer.style.cursor = 'crosshair';
             } else {
                 cancelAddMode();
@@ -493,26 +442,16 @@
         function cancelAddMode() {
             isAddMode = false;
             const instruction = document.getElementById('add-instruction');
-            instruction.classList.add('hidden');
-            instruction.classList.remove('flex');
+            instruction.classList.add('hidden'); instruction.classList.remove('flex');
             document.getElementById('map').style.cursor = '';
-            if (tempMarker) {
-                map.removeLayer(tempMarker);
-                tempMarker = null;
-            }
+            if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
         }
 
         function onMapClick(e) {
             if (!isAddMode) return;
             const { lat, lng } = e.latlng;
-
-            // ลบหมุดชั่วคราวเก่า (ถ้ามี)
             if (tempMarker) map.removeLayer(tempMarker);
-            
-            // ปักหมุดชั่วคราวใหม่
             tempMarker = L.marker([lat, lng]).addTo(map);
-
-            // ใส่ค่าลงในฟอร์มและเปิด Modal
             document.getElementById('lat-input').value = lat;
             document.getElementById('lng-input').value = lng;
             document.getElementById('add-modal').classList.remove('hidden');
@@ -520,60 +459,37 @@
 
         function closeModal() {
             document.getElementById('add-modal').classList.add('hidden');
-            // ลบหมุดชั่วคราวออกถ้ากดยกเลิก
-            if(tempMarker) {
-                map.removeLayer(tempMarker);
-                tempMarker = null;
-            }
+            if(tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
         }
 
-        // --- 6. บันทึกข้อมูลลง Firestore ---
         async function saveAED(e) {
             e.preventDefault();
-
-            if (!currentUser) {
-                alert("กรุณารอสักครู่ ระบบกำลังยืนยันตัวตน");
-                return;
-            }
-
+            if (!currentUser) { alert("กรุณารอสักครู่ ระบบกำลังยืนยันตัวตน"); return; }
             const name = document.getElementById('location-name').value;
             const detail = document.getElementById('location-detail').value;
             const access = document.querySelector('input[name="access"]:checked').value;
             const lat = parseFloat(document.getElementById('lat-input').value);
             const lng = parseFloat(document.getElementById('lng-input').value);
-
-            // UI Loading State (เปลี่ยนปุ่มเป็นสถานะกำลังโหลด)
             const submitBtn = document.querySelector('#aed-form button[type="submit"]');
             const originalContent = submitBtn.innerHTML;
             submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> กำลังบันทึก...';
             submitBtn.disabled = true;
 
             try {
-                // บันทึกลง Firestore
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'), {
-                    name,
-                    detail,
-                    lat,
-                    lng,
-                    access,
-                    createdBy: currentUser.uid, // เก็บว่าใครเป็นคนสร้าง (Anonymous ID)
+                    name, detail, lat, lng, access,
+                    createdBy: currentUser.uid,
                     timestamp: Date.now(),
                     verified: false
                 });
-
-                // สำเร็จ
                 document.getElementById('aed-form').reset();
                 closeModal();
                 cancelAddMode();
-                
-                // Feedback (อาจจะเปลี่ยนเป็น Toast notification ในอนาคต)
-                alert('✅ บันทึกข้อมูลเรียบร้อย ขอบคุณที่ร่วมแบ่งปันข้อมูลเพื่อสังคม!');
-
+                alert('✅ บันทึกข้อมูลเรียบร้อย');
             } catch (error) {
                 console.error("Save Error:", error);
                 alert("❌ เกิดข้อผิดพลาด: " + error.message);
             } finally {
-                // คืนค่าปุ่มกลับสู่สภาพเดิม
                 submitBtn.innerHTML = originalContent;
                 submitBtn.disabled = false;
             }
