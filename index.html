@@ -90,7 +90,7 @@
         
         <!-- Error Message / Retry Button -->
         <div id="error-container" class="hidden mt-2">
-            <p id="error-message" class="text-red-500 text-sm mb-3">การเชื่อมต่อมีปัญหา</p>
+            <p id="error-message" class="text-red-500 text-sm mb-3">การเชื่อมต่อล่าช้ากว่าปกติ</p>
             <button onclick="window.location.reload()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700">
                 <i class="fa-solid fa-rotate-right mr-1"></i> โหลดใหม่
             </button>
@@ -208,21 +208,21 @@
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         // --- Config Section ---
-        // เอาโค้ดจาก Firebase มาแปะทับตรงนี้เลยครับ
+        // ใส่โค้ด Firebase ของคุณที่นี่
         let firebaseConfig = {
-            apiKey: "AIzaSy.... (ใส่ค่าของคุณ)",
-            authDomain: "project-name.firebaseapp.com",
-            projectId: "project-name",
-            storageBucket: "project-name.firebasestorage.app",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef"
+          apiKey: "AIzaSyDp0HC7Wh2fH13XbMXrzvrFSQpB3q0breI",
+          authDomain: "aed-map-th-488a6.firebaseapp.com",
+          projectId: "aed-map-th-488a6",
+          storageBucket: "aed-map-th-488a6.firebasestorage.app",
+          messagingSenderId: "264816215714",
+          appId: "1:264816215714:web:92494e9281eed1f7e5f9fb"
         };
         
-        // ตั้งชื่อ App ID เองได้เลย (ภาษาอังกฤษตัวเล็ก ห้ามเว้นวรรค)
-        let appId = 'my-aed-map';
+        let appId = 'aed-map-th-488a6'; // ใช้ Project ID เป็น App ID เพื่อความสะดวก
 
-        // [เฉพาะส่วนนี้] โค้ดสำรองเพื่อให้หน้า Preview ทำงานได้ (ลบออกได้เมื่อนำไปใช้จริง)
-        if ((!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ใส่ค่าของคุณ")) && typeof __firebase_config !== 'undefined') {
+        // โค้ดสำรองสำหรับ Preview (ถ้าคุณใช้ในเว็บนี้ มันอาจจะยังพยายามใช้ Config ของระบบ)
+        // แต่ถ้าเอาไปรันข้างนอก โค้ดด้านบนจะทำงาน 100%
+        if (typeof __firebase_config !== 'undefined' && (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ใส่ค่าของคุณ"))) {
             console.log("Using Preview Environment Config");
             firebaseConfig = JSON.parse(__firebase_config);
             appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -240,7 +240,7 @@
         let markersLayer = L.layerGroup();
         let currentUser = null;
         let unsubscribeData = null;
-        let retryCount = 0; // ตัวนับจำนวนครั้งที่ลองเชื่อมต่อใหม่
+        let retryCount = 0;
 
         window.locateUser = locateUser;
         window.toggleAddMode = toggleAddMode;
@@ -281,13 +281,9 @@
                         currentUser = user;
                         document.getElementById('loading-text').innerText = 'กำลังโหลดตำแหน่ง AED...';
                         setupDataListener(); 
-                    } else {
-                        // User logged out
                     }
                 });
 
-                // Start Authentication Process
-                // ไม่บังคับ SignOut แต่แรก แต่จะ SignOut ก็ต่อเมื่อเจอ Permission Denied
                 if (!auth.currentUser) {
                     await performSignIn();
                 }
@@ -301,10 +297,12 @@
         }
 
         async function performSignIn() {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            // ถ้าอยู่ใน Preview Environment ใช้ Custom Token
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token && (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ใส่ค่าของคุณ"))) {
                 console.log("Signing in with custom token...");
                 await signInWithCustomToken(auth, __initial_auth_token);
             } else {
+                // ถ้าใช้ Config ของคุณเอง ให้ใช้ Anonymous Auth
                 console.log("Signing in anonymously...");
                 await signInAnonymously(auth);
             }
@@ -325,8 +323,6 @@
                     aedData.push({ id: doc.id, ...doc.data() });
                 });
                 renderMarkers(aedData);
-                
-                // Success - Reset retry count
                 retryCount = 0;
                 
                 const loading = document.getElementById('loading');
@@ -338,21 +334,14 @@
                 console.error("Data Load Error:", error);
                 
                 if (error.code === 'permission-denied') {
-                    // *** Auto-Fix Logic ***
                     if (retryCount < 1) {
                         retryCount++;
-                        console.warn("Permission denied. Attempting to refresh session (SignOut & SignIn)...");
+                        console.warn("Permission denied. Attempting to refresh session...");
                         document.getElementById('loading-text').innerText = 'กำลังรีเซ็ตการเชื่อมต่อ...';
-                        
-                        // Force Sign Out and then Re-Sign In
-                        signOut(auth).then(() => {
-                            return performSignIn();
-                        }).catch(e => console.error("Retry failed:", e));
-                        
+                        signOut(auth).then(() => performSignIn());
                     } else {
-                        // ถ้าลองแล้วยังไม่ได้ ให้แจ้ง User
                         document.getElementById('loading-text').innerText = 'สิทธิ์การเข้าถึงถูกปฏิเสธ';
-                        document.getElementById('error-message').innerText = 'ไม่สามารถเข้าถึงข้อมูลได้ กรุณากดโหลดใหม่';
+                        document.getElementById('error-message').innerText = 'ไม่สามารถเข้าถึงข้อมูลได้ กรุณาตรวจสอบ Security Rules ใน Firebase Console';
                         document.getElementById('error-container').classList.remove('hidden');
                     }
                 }
