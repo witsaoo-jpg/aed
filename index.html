@@ -2,25 +2,28 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>AED Map Thailand - แผนที่จุดติดตั้งเครื่องกระตุกหัวใจ</title>
     
-    <!-- Tailwind CSS -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#ef4444">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1057/1057242.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Google Fonts (Kanit) -->
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
         body {
             font-family: 'Kanit', sans-serif;
             overflow: hidden;
+            touch-action: manipulation; /* ป้องกันการซูมแบบหน่วงในบางเบราว์เซอร์ */
         }
         #map {
             height: 100vh;
@@ -31,20 +34,16 @@
             border-radius: 12px;
             padding: 0;
             overflow: hidden;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
         }
         .custom-popup .leaflet-popup-content {
             margin: 0;
             width: 280px !important;
         }
-        .custom-popup .leaflet-popup-tip {
-            background: white;
-        }
         .user-pin {
             background-color: #3b82f6;
             border: 3px solid white;
             border-radius: 50%;
-            box-shadow: 0 0 0 rgba(59, 130, 246, 0.4);
             animation: pulse 2s infinite;
         }
         @keyframes pulse {
@@ -62,10 +61,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             font-size: 18px;
             color: #ef4444;
-            transition: transform 0.2s;
-        }
-        .aed-marker-icon:hover {
-            transform: scale(1.1);
         }
         #loading {
             position: fixed;
@@ -76,140 +71,99 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            transition: opacity 0.5s ease;
         }
     </style>
 </head>
 <body class="bg-gray-100 relative">
 
-    <!-- Loading Screen -->
     <div id="loading" class="px-4 text-center">
         <div class="text-red-500 text-6xl mb-4"><i class="fa-solid fa-heart-pulse fa-beat"></i></div>
         <h1 class="text-2xl font-bold text-gray-800">AED Map Thailand</h1>
         <p id="loading-text" class="text-gray-500 mb-4 mt-2">กำลังเชื่อมต่อฐานข้อมูล...</p>
         
-        <!-- Error Message / Retry Button -->
         <div id="error-container" class="hidden mt-2">
-            <p id="error-message" class="text-red-500 text-sm mb-3">การเชื่อมต่อล่าช้ากว่าปกติ</p>
-            <button onclick="window.location.reload()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700">
+            <button onclick="window.location.reload()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm">
                 <i class="fa-solid fa-rotate-right mr-1"></i> โหลดใหม่
             </button>
         </div>
-
-        <div class="absolute bottom-10 text-center left-0 right-0">
-            <p class="text-xs text-gray-400">พัฒนาโดย</p>
-            <p class="text-sm font-semibold text-gray-600">พว.วิษณุกรณ์ โอยา</p>
-        </div>
     </div>
 
-    <!-- Header / Emergency Bar -->
     <div class="fixed top-0 left-0 right-0 z-[1000] bg-white/90 backdrop-blur-sm shadow-md px-4 py-3 flex justify-between items-center rounded-b-2xl border-b border-gray-200">
         <div class="flex items-center gap-2">
-            <div class="bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-sm">
+            <div class="bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center">
                 <i class="fa-solid fa-heart-pulse"></i>
             </div>
             <div>
                 <h1 class="font-bold text-gray-800 text-lg leading-none">AED Map</h1>
-                <span class="text-[10px] text-green-600 font-medium bg-green-100 px-1.5 py-0.5 rounded-full"><i class="fa-solid fa-signal text-[8px]"></i> Online</span>
+                <span id="status-badge" class="text-[10px] text-gray-400 font-medium bg-gray-100 px-1.5 py-0.5 rounded-full">Connecting...</span>
             </div>
         </div>
-        <a href="tel:1669" class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-5 py-2 rounded-full font-bold shadow-lg shadow-red-200 flex items-center gap-2 animate-pulse transition-all">
+        <a href="tel:1669" class="bg-red-600 text-white px-5 py-2 rounded-full font-bold shadow-lg animate-pulse">
             <i class="fa-solid fa-phone"></i> 1669
         </a>
     </div>
 
-    <!-- Map Container -->
     <div id="map"></div>
 
-    <!-- Credit Overlay -->
-    <div class="fixed bottom-1 left-2 z-[400] pointer-events-none select-none">
-        <p class="text-[10px] text-gray-500 bg-white/80 px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm border border-gray-100">
-            Dev by พว.วิษณุกรณ์ โอยา
-        </p>
-    </div>
-    
-    <!-- Action Buttons -->
-    <div class="fixed bottom-24 right-4 z-[999] flex flex-col gap-3">
-        <button onclick="locateUser()" class="bg-white text-gray-700 w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 active:scale-95 transition-all focus:outline-none border border-gray-100" title="ตำแหน่งของฉัน">
+    <div class="fixed bottom-24 right-4 z-[999]">
+        <button onclick="locateUser()" class="bg-white text-gray-700 w-12 h-12 rounded-full shadow-lg flex items-center justify-center border border-gray-100">
             <i class="fa-solid fa-crosshairs text-xl text-blue-500"></i>
         </button>
     </div>
 
-    <!-- Add Button -->
     <div class="fixed bottom-6 left-0 right-0 z-[1000] flex justify-center pointer-events-none">
-        <button onclick="toggleAddMode()" class="pointer-events-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3.5 rounded-full shadow-xl shadow-green-200 font-bold flex items-center gap-2 transform transition hover:scale-105 active:scale-95">
+        <button onclick="toggleAddMode()" class="pointer-events-auto bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3.5 rounded-full shadow-xl font-bold flex items-center gap-2">
             <i class="fa-solid fa-plus text-lg"></i> แจ้งจุดติดตั้ง AED
         </button>
     </div>
 
-    <!-- Add Instruction -->
-    <div id="add-instruction" class="hidden fixed top-28 left-1/2 transform -translate-x-1/2 bg-gray-800/90 text-white px-4 py-2 rounded-full shadow-lg z-[1001] text-sm text-center w-max backdrop-blur-md">
+    <div id="add-instruction" class="hidden fixed top-28 left-1/2 transform -translate-x-1/2 bg-gray-800/90 text-white px-4 py-2 rounded-full shadow-lg z-[1001] text-sm">
         <span class="flex items-center gap-2">
             <i class="fa-solid fa-location-dot text-red-400"></i> แตะบนแผนที่เพื่อปักหมุด
-            <span class="w-px h-4 bg-gray-600 mx-1"></span>
-            <button onclick="cancelAddMode()" class="text-gray-300 hover:text-white underline font-medium">ยกเลิก</button>
+            <button onclick="cancelAddMode()" class="ml-2 underline">ยกเลิก</button>
         </span>
     </div>
 
-    <!-- Modal Form -->
-    <div id="add-modal" class="hidden fixed inset-0 z-[2000] bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm transition-all">
-        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 slide-up-animation max-h-[90vh] overflow-y-auto">
+    <div id="add-modal" class="hidden fixed inset-0 z-[2000] bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <span class="bg-red-100 text-red-500 w-8 h-8 rounded-lg flex items-center justify-center text-sm"><i class="fa-solid fa-map-pin"></i></span>
-                    เพิ่มจุด AED ใหม่
-                </h2>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 bg-gray-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
-                    <i class="fa-solid fa-times text-lg"></i>
-                </button>
+                <h2 class="text-xl font-bold text-gray-800">เพิ่มจุด AED ใหม่</h2>
+                <button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button>
             </div>
             
             <form id="aed-form" onsubmit="saveAED(event)">
                 <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">สถานที่ <span class="text-red-500">*</span></label>
-                    <input type="text" id="location-name" required placeholder="เช่น เซ็นทรัลเวิลด์, BTS สยาม" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-gray-50 transition-all">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">สถานที่ *</label>
+                    <input type="text" id="location-name" required class="w-full px-4 py-3 border rounded-xl bg-gray-50">
                 </div>
-                
                 <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">รายละเอียดตำแหน่ง <span class="text-red-500">*</span></label>
-                    <textarea id="location-detail" required rows="2" placeholder="เช่น ชั้น 1 หน้าลิฟต์แก้ว, ห้องพยาบาล" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-gray-50 transition-all"></textarea>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">รายละเอียดตำแหน่ง *</label>
+                    <textarea id="location-detail" required rows="2" class="w-full px-4 py-3 border rounded-xl bg-gray-50"></textarea>
                 </div>
-
                 <div class="mb-6">
                      <label class="block text-gray-700 text-sm font-bold mb-2">ประเภทการเข้าถึง</label>
                      <div class="flex gap-3">
-                        <label class="flex-1 flex items-center justify-center gap-2 border-2 border-transparent bg-gray-50 p-3 rounded-xl cursor-pointer hover:bg-gray-100 transition-all has-[:checked]:bg-green-50 has-[:checked]:border-green-500 has-[:checked]:text-green-700">
-                            <input type="radio" name="access" value="public" checked class="accent-green-500 w-4 h-4">
-                            <span class="text-sm font-medium">สาธารณะ</span>
+                        <label class="flex-1 text-center border p-3 rounded-xl cursor-pointer has-[:checked]:bg-green-50 has-[:checked]:border-green-500">
+                            <input type="radio" name="access" value="public" checked class="hidden"> สาธารณะ
                         </label>
-                        <label class="flex-1 flex items-center justify-center gap-2 border-2 border-transparent bg-gray-50 p-3 rounded-xl cursor-pointer hover:bg-gray-100 transition-all has-[:checked]:bg-orange-50 has-[:checked]:border-orange-500 has-[:checked]:text-orange-700">
-                            <input type="radio" name="access" value="restricted" class="accent-orange-500 w-4 h-4">
-                            <span class="text-sm font-medium">จำกัดเวลา/คน</span>
+                        <label class="flex-1 text-center border p-3 rounded-xl cursor-pointer has-[:checked]:bg-orange-50 has-[:checked]:border-orange-500">
+                            <input type="radio" name="access" value="restricted" class="hidden"> จำกัดเวลา
                         </label>
                      </div>
                 </div>
-
-                <input type="hidden" id="lat-input">
-                <input type="hidden" id="lng-input">
-
-                <button type="submit" class="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-red-200 transition duration-200 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed flex justify-center items-center gap-2">
-                    <i class="fa-solid fa-save"></i> ยืนยันข้อมูล
-                </button>
+                <input type="hidden" id="lat-input"><input type="hidden" id="lng-input">
+                <button type="submit" class="w-full bg-red-500 text-white font-bold py-3.5 rounded-xl shadow-lg">ยืนยันข้อมูล</button>
             </form>
         </div>
     </div>
 
-    <!-- Script -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-        // ===============================================
-        // ส่วนการตั้งค่า Firebase (ใช้ค่าของคุณ 100%)
-        // ===============================================
         const firebaseConfig = {
           apiKey: "AIzaSyDp0HC7Wh2fH13XbMXrzvrFSQpB3q0breI",
           authDomain: "aed-map-th-488a6.firebaseapp.com",
@@ -219,289 +173,136 @@
           appId: "1:264816215714:web:92494e9281eed1f7e5f9fb"
         };
         
-        // ใช้ชื่อ Project ID เป็นชื่อแอป เพื่อความชัวร์เรื่องสิทธิ์
         const appId = 'aed-map-th-488a6';
-
-        // เริ่มต้นการทำงาน Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Global Variables
-        let map;
-        let userMarker;
+        let map, userMarker, tempMarker, currentUser = null;
         let isAddMode = false;
-        let tempMarker = null;
         let markersLayer = L.layerGroup();
-        let currentUser = null;
-        let unsubscribeData = null;
-        let retryCount = 0;
 
-        window.locateUser = locateUser;
-        window.toggleAddMode = toggleAddMode;
-        window.cancelAddMode = cancelAddMode;
-        window.closeModal = closeModal;
-        window.saveAED = saveAED;
-        window.deleteAED = deleteAED;
+        // Export functions to window
+        Object.assign(window, { locateUser, toggleAddMode, cancelAddMode, closeModal, saveAED, deleteAED });
 
-        window.onload = async function() {
-            setTimeout(() => {
-                const loading = document.getElementById('loading');
-                if (loading && loading.style.display !== 'none' && loading.style.opacity !== '0') {
-                    document.getElementById('loading-text').innerText = 'การเชื่อมต่อใช้เวลานานกว่าปกติ...';
-                    document.getElementById('error-container').classList.remove('hidden');
-                }
-            }, 15000);
-
+        window.onload = () => {
             initMap();
-            await initAuth();
+            initAuth();
+            registerServiceWorker();
         };
 
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([13.7649, 100.5383], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors | Dev by พว.วิษณุกรณ์ โอยา'
-            }).addTo(map);
-            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             markersLayer.addTo(map);
             map.on('click', onMapClick);
             locateUser();
         }
 
         async function initAuth() {
-            try {
-                // ติดตามสถานะ Login
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        console.log("Authenticated User:", user.uid);
-                        currentUser = user;
-                        document.getElementById('loading-text').innerText = 'กำลังโหลดตำแหน่ง AED...';
-                        setupDataListener(); 
-                    } else {
-                        // ถ้าหลุด ให้หยุดฟังข้อมูล
-                        if(unsubscribeData) unsubscribeData();
-                    }
-                });
-
-                // ตรวจสอบสถานะและทำการ Login
-                if (!auth.currentUser) {
-                    console.log("Starting Anonymous Auth...");
-                    await signInAnonymously(auth);
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('status-badge').innerHTML = '<i class="fa-solid fa-signal text-[8px]"></i> Online';
+                    document.getElementById('status-badge').className = "text-[10px] text-green-600 font-medium bg-green-100 px-1.5 py-0.5 rounded-full";
+                    setupDataListener();
                 } else {
-                    console.log("User already logged in");
+                    signInAnonymously(auth).catch(err => console.error("Auth Error", err));
                 }
-
-            } catch (error) {
-                console.error("Auth Init Error:", error);
-                document.getElementById('loading-text').innerText = 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
-                document.getElementById('error-message').innerText = error.message;
-                document.getElementById('error-container').classList.remove('hidden');
-            }
+            });
         }
 
         function setupDataListener() {
-            if (unsubscribeData) {
-                unsubscribeData();
-            }
-
-            console.log("Listening to path:", `artifacts/${appId}/public/data/aed_locations`);
-            const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations');
-            const q = query(collectionRef);
-            
-            unsubscribeData = onSnapshot(q, (snapshot) => {
-                const aedData = [];
-                snapshot.forEach((doc) => {
-                    aedData.push({ id: doc.id, ...doc.data() });
-                });
-                renderMarkers(aedData);
-                
-                // โหลดเสร็จแล้ว -> รีเซ็ตตัวนับ -> ปิดหน้า Loading
-                retryCount = 0;
-                const loading = document.getElementById('loading');
-                if (loading) {
-                    loading.style.opacity = '0';
-                    setTimeout(() => loading.style.display = 'none', 500);
-                }
-            }, (error) => {
-                console.error("Data Load Error:", error);
-                
-                if (error.code === 'permission-denied') {
-                    // *** Auto-Recovery Logic ***
-                    // ถ้าโดนปฏิเสธสิทธิ์ ให้ลอง Sign Out แล้วเข้าใหม่ 1 ครั้ง (เผื่อ Token เก่าค้าง)
-                    if (retryCount < 1) {
-                        retryCount++;
-                        console.warn("Permission denied. Trying to refresh session...");
-                        document.getElementById('loading-text').innerText = 'กำลังรีเซ็ตการเชื่อมต่อ...';
-                        
-                        signOut(auth).then(() => {
-                            return signInAnonymously(auth);
-                        }).catch(e => console.error("Retry failed:", e));
-                    } else {
-                        document.getElementById('loading-text').innerText = 'สิทธิ์การเข้าถึงถูกปฏิเสธ';
-                        document.getElementById('error-message').innerText = 'กรุณากดโหลดใหม่ หรือตรวจสอบการตั้งค่า Firebase';
-                        document.getElementById('error-container').classList.remove('hidden');
-                    }
-                }
+            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'));
+            onSnapshot(q, (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderMarkers(data);
+                document.getElementById('loading').style.display = 'none';
             });
         }
 
         function renderMarkers(data) {
             markersLayer.clearLayers();
-            const createAedIcon = () => L.divIcon({
-                className: 'custom-div-icon',
-                html: `<div class='aed-marker-icon'><i class='fa-solid fa-heart-pulse'></i></div>`,
-                iconSize: [40, 40],
-                iconAnchor: [20, 20],
-                popupAnchor: [0, -25]
-            });
-
             data.forEach(point => {
-                if (!point.lat || !point.lng) return;
-                const marker = L.marker([point.lat, point.lng], { icon: createAedIcon() });
-                
-                const isOwner = currentUser && point.createdBy === currentUser.uid;
-                let deleteButtonHtml = '';
-                if (isOwner) {
-                    deleteButtonHtml = `
-                        <button onclick="deleteAED('${point.id}')" class="w-full mt-2 bg-red-100 hover:bg-red-200 text-red-600 text-xs py-2 rounded-lg font-bold transition-colors flex items-center justify-center gap-1">
-                            <i class="fa-solid fa-trash-can"></i> ลบข้อมูลนี้
-                        </button>
-                    `;
-                }
+                const marker = L.marker([point.lat, point.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='aed-marker-icon'><i class='fa-solid fa-heart-pulse'></i></div>`,
+                        iconSize: [40, 40], iconAnchor: [20, 20], popupAnchor: [0, -25]
+                    })
+                });
 
-                const popupContent = `
+                const isOwner = currentUser && point.createdBy === currentUser.uid;
+                const delBtn = isOwner ? `<button onclick="deleteAED('${point.id}')" class="w-full mt-2 bg-red-100 text-red-600 py-2 rounded-lg text-xs font-bold">ลบข้อมูลนี้</button>` : '';
+
+                marker.bindPopup(`
                     <div class="font-kanit p-1">
-                        <div class="flex items-center justify-between mb-3 border-b pb-2">
-                            <span class="bg-red-50 text-red-600 px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 border border-red-100">
-                                <i class="fa-solid fa-bolt"></i> AED
-                            </span>
-                            <span class="text-[10px] ${point.access === 'public' ? 'text-green-600 bg-green-50' : 'text-orange-600 bg-orange-50'} px-2 py-1 rounded border">
-                                ${point.access === 'public' ? 'สาธารณะ' : 'จำกัดเวลา'}
-                            </span>
-                        </div>
-                        <h3 class="font-bold text-lg text-gray-800 leading-tight mb-1">${point.name}</h3>
-                        <p class="text-gray-600 text-sm mb-4"><i class="fa-solid fa-location-dot text-gray-400 mr-1"></i> ${point.detail}</p>
-                        <a href="https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}" target="_blank" 
-                           class="flex items-center justify-center w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm">
-                           <i class="fa-solid fa-diamond-turn-right mr-2"></i> นำทาง
-                        </a>
-                        ${deleteButtonHtml}
-                        <div class="mt-2 text-right">
-                             <span class="text-[10px] text-gray-300">ID: ${point.id ? point.id.substring(0,4) : 'N/A'}</span>
-                        </div>
+                        <h3 class="font-bold text-lg text-gray-800">${point.name}</h3>
+                        <p class="text-gray-600 text-sm mb-3">${point.detail}</p>
+                        <a href="https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}" target="_blank" class="block w-full bg-blue-600 text-white text-center py-2.5 rounded-lg text-sm font-bold">นำทาง</a>
+                        ${delBtn}
                     </div>
-                `;
-                marker.bindPopup(popupContent, { className: 'custom-popup' });
+                `, { className: 'custom-popup' });
                 markersLayer.addLayer(marker);
             });
         }
 
-        async function deleteAED(docId) {
-            if(!confirm('คุณแน่ใจหรือไม่ที่จะลบจุด AED นี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
-            try {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', docId));
-                alert('ลบข้อมูลเรียบร้อยแล้ว');
-            } catch (error) {
-                console.error("Delete Error:", error);
-                alert("ไม่สามารถลบได้: " + error.message);
+        async function deleteAED(id) {
+            if(confirm('ยืนยันการลบ?')) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id));
             }
         }
 
         function locateUser() {
-            const btn = document.querySelector('button[title="ตำแหน่งของฉัน"] i');
-            btn.classList.add('fa-spin');
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        map.setView([latitude, longitude], 16);
-                        if (userMarker) map.removeLayer(userMarker);
-                        const userIcon = L.divIcon({ className: 'user-pin', iconSize: [24, 24], iconAnchor: [12, 12] });
-                        userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map).bindPopup("<b>คุณอยู่ที่นี่</b>").openPopup();
-                        btn.classList.remove('fa-spin');
-                    },
-                    (error) => {
-                        console.error("GPS Error:", error);
-                        btn.classList.remove('fa-spin');
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-            } else {
-                alert("เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง");
-                btn.classList.remove('fa-spin');
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    const { latitude, longitude } = pos.coords;
+                    map.setView([latitude, longitude], 16);
+                    if (userMarker) map.removeLayer(userMarker);
+                    userMarker = L.marker([latitude, longitude], {
+                        icon: L.divIcon({ className: 'user-pin', iconSize: [24, 24], iconAnchor: [12, 12] })
+                    }).addTo(map);
+                }, null, { enableHighAccuracy: true });
             }
         }
 
-        function toggleAddMode() {
-            if (!currentUser) { alert("ระบบกำลังเชื่อมต่อ... กรุณารอสักครู่"); return; }
-            isAddMode = !isAddMode;
-            const instruction = document.getElementById('add-instruction');
-            const mapContainer = document.getElementById('map');
-            if (isAddMode) {
-                instruction.classList.remove('hidden'); instruction.classList.add('flex');
-                mapContainer.style.cursor = 'crosshair';
-            } else {
-                cancelAddMode();
-            }
-        }
-
-        function cancelAddMode() {
-            isAddMode = false;
-            const instruction = document.getElementById('add-instruction');
-            instruction.classList.add('hidden'); instruction.classList.remove('flex');
-            document.getElementById('map').style.cursor = '';
-            if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
-        }
+        function toggleAddMode() { isAddMode = true; document.getElementById('add-instruction').classList.remove('hidden'); }
+        function cancelAddMode() { isAddMode = false; document.getElementById('add-instruction').classList.add('hidden'); if(tempMarker) map.removeLayer(tempMarker); }
+        function closeModal() { document.getElementById('add-modal').classList.add('hidden'); cancelAddMode(); }
 
         function onMapClick(e) {
             if (!isAddMode) return;
-            const { lat, lng } = e.latlng;
             if (tempMarker) map.removeLayer(tempMarker);
-            tempMarker = L.marker([lat, lng]).addTo(map);
-            document.getElementById('lat-input').value = lat;
-            document.getElementById('lng-input').value = lng;
+            tempMarker = L.marker(e.latlng).addTo(map);
+            document.getElementById('lat-input').value = e.latlng.lat;
+            document.getElementById('lng-input').value = e.latlng.lng;
             document.getElementById('add-modal').classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('add-modal').classList.add('hidden');
-            if(tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
         }
 
         async function saveAED(e) {
             e.preventDefault();
-            if (!currentUser) { alert("กรุณารอสักครู่ ระบบกำลังยืนยันตัวตน"); return; }
-            const name = document.getElementById('location-name').value;
-            const detail = document.getElementById('location-detail').value;
-            const access = document.querySelector('input[name="access"]:checked').value;
-            const lat = parseFloat(document.getElementById('lat-input').value);
-            const lng = parseFloat(document.getElementById('lng-input').value);
-            const submitBtn = document.querySelector('#aed-form button[type="submit"]');
-            const originalContent = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> กำลังบันทึก...';
-            submitBtn.disabled = true;
-
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
             try {
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'), {
-                    name, detail, lat, lng, access,
+                    name: document.getElementById('location-name').value,
+                    detail: document.getElementById('location-detail').value,
+                    access: document.querySelector('input[name="access"]:checked').value,
+                    lat: parseFloat(document.getElementById('lat-input').value),
+                    lng: parseFloat(document.getElementById('lng-input').value),
                     createdBy: currentUser.uid,
-                    timestamp: Date.now(),
-                    verified: false
+                    timestamp: Date.now()
                 });
-                document.getElementById('aed-form').reset();
                 closeModal();
-                cancelAddMode();
-                alert('✅ บันทึกข้อมูลเรียบร้อย');
-            } catch (error) {
-                console.error("Save Error:", error);
-                alert("❌ เกิดข้อผิดพลาด: " + error.message);
-            } finally {
-                submitBtn.innerHTML = originalContent;
-                submitBtn.disabled = false;
+            } catch (err) { alert(err.message); }
+            btn.disabled = false;
+        }
+
+        function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./service-worker.js').catch(err => console.log(err));
             }
         }
     </script>
 </body>
 </html>
-
-
