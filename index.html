@@ -9,7 +9,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#ef4444">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1057/1057242.png">
+    
+    <link rel="apple-touch-icon" href="aed_logo.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -85,7 +86,8 @@
 <body class="bg-gray-100 relative">
 
     <div id="loading" class="px-4 text-center">
-        <div class="text-red-500 text-6xl mb-4"><i class="fa-solid fa-heart-pulse fa-beat"></i></div>
+        <img src="aed_logo.png" alt="AED Logo" class="w-24 h-24 mb-4 object-contain animate-pulse">
+        
         <h1 class="text-2xl font-bold text-gray-800">AED Map Thailand</h1>
         <p id="loading-text" class="text-gray-500 mb-4 mt-2">กำลังเชื่อมต่อฐานข้อมูล...</p>
         
@@ -98,9 +100,8 @@
 
     <div class="fixed top-0 left-0 right-0 z-[1000] bg-white/90 backdrop-blur-sm shadow-md px-4 py-3 flex justify-between items-center rounded-b-2xl border-b border-gray-200">
         <div class="flex items-center gap-2">
-            <div class="bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center">
-                <i class="fa-solid fa-heart-pulse"></i>
-            </div>
+            <img src="aed_logo.png" alt="Logo" class="w-10 h-10 rounded-full border border-gray-200 bg-white object-cover shadow-sm">
+            
             <div>
                 <h1 class="font-bold text-gray-800 text-lg leading-none">AED Map</h1>
                 <span id="status-badge" class="text-[10px] text-gray-400 font-medium bg-gray-100 px-1.5 py-0.5 rounded-full">Connecting...</span>
@@ -226,8 +227,8 @@
             closeModal, 
             saveAED, 
             deleteAED,
-            openHandbook, // Exported new function
-            closeHandbook // Exported new function
+            openHandbook, 
+            closeHandbook 
         });
 
         window.onload = () => {
