@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AED Map Thailand - Admin System</title>
+    <title>AED Map Thailand - Final Professional Edition</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -11,86 +11,105 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        body { font-family: 'Kanit', sans-serif; overflow: hidden; }
+        body { font-family: 'Kanit', sans-serif; overflow: hidden; touch-action: manipulation; }
         #map { height: 100vh; width: 100%; z-index: 1; }
         .admin-view { position: fixed; inset: 0; background: #f8fafc; z-index: 5000; display: none; overflow-y: auto; }
         .stat-card { background: white; border-radius: 1rem; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
         .aed-marker-approved { display: flex; justify-content: center; align-items: center; background-color: white; border: 2px solid #ef4444; border-radius: 50%; color: #ef4444; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .aed-marker-pending { display: flex; justify-content: center; align-items: center; background-color: #f3f4f6; border: 2px solid #9ca3af; border-radius: 50%; color: #9ca3af; }
+        .user-pin { background-color: #3b82f6; border: 3px solid white; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+        .custom-popup .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; }
+        .custom-popup .leaflet-popup-content { margin: 0; width: 280px !important; }
     </style>
 </head>
 <body class="bg-gray-100">
 
     <div class="fixed top-0 left-0 right-0 z-[1000] bg-white/90 backdrop-blur-sm shadow-md px-4 py-3 flex justify-between items-center rounded-b-2xl border-b border-gray-200">
         <div class="flex items-center gap-2">
-            <img src="aed_logo.png" alt="Logo" class="w-10 h-10 rounded-full bg-white object-contain border">
+            <img src="aed_logo.png" alt="Logo" class="w-10 h-10 rounded-full border bg-white object-contain">
             <div>
                 <h1 class="font-bold text-gray-800 text-lg leading-none">AED Map</h1>
                 <span id="status-badge" class="text-[10px] text-gray-400 font-medium bg-gray-100 px-1.5 py-0.5 rounded-full cursor-pointer">Connecting...</span>
             </div>
         </div>
         <div class="flex items-center gap-2">
-            <button id="admin-entry-btn" onclick="toggleAdminView()" class="hidden bg-gray-800 text-white px-3 py-2 rounded-full text-sm font-bold shadow-lg">
+            <button id="admin-entry-btn" onclick="toggleAdminView()" class="hidden bg-gray-800 text-white px-3 py-2 rounded-full text-sm font-bold shadow-lg transition-all active:scale-90">
                 <i class="fa-solid fa-chart-pie mr-1"></i> Dashboard
             </button>
-            <a href="tel:1669" class="bg-red-600 text-white px-4 py-2 rounded-full font-bold shadow-lg animate-pulse text-sm">1669</a>
+            <a href="tel:1669" class="bg-red-600 text-white px-4 py-2 rounded-full font-bold shadow-lg animate-pulse text-sm">
+                <i class="fa-solid fa-phone"></i> 1669
+            </a>
         </div>
     </div>
 
     <div id="map"></div>
 
+    <div class="fixed bottom-28 right-4 z-[999]">
+        <button onclick="locateUser()" class="bg-white text-gray-700 w-12 h-12 rounded-full shadow-xl flex items-center justify-center border border-gray-100 active:scale-90 transition-all">
+            <i class="fa-solid fa-crosshairs text-xl text-blue-500"></i>
+        </button>
+    </div>
+
+    <div class="fixed bottom-8 left-0 right-0 z-[1000] flex justify-center pointer-events-none">
+        <button onclick="toggleAddMode()" class="pointer-events-auto bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-full shadow-2xl font-bold flex items-center gap-2 active:scale-95 transition-all">
+            <i class="fa-solid fa-plus text-lg"></i> แจ้งจุดติดตั้ง AED
+        </button>
+    </div>
+
     <div id="admin-view" class="admin-view p-4 sm:p-8">
         <div class="max-w-6xl mx-auto">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">แผงควบคุมผู้ดูแลระบบ</h2>
-                <button onclick="toggleAdminView()" class="bg-white border p-2 rounded-full w-10 h-10 shadow-sm">&times;</button>
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">ระบบบริหารจัดการข้อมูล AED</h2>
+                    <p class="text-sm text-gray-500">สำหรับตรวจสอบและส่งออกรายงาน (Admin Only)</p>
+                </div>
+                <button onclick="toggleAdminView()" class="bg-white border w-10 h-10 rounded-full shadow-sm hover:bg-gray-50 text-xl font-bold">×</button>
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div class="stat-card">
-                    <p class="text-xs text-gray-500 uppercase font-bold">จุดทั้งหมด</p>
-                    <p id="stat-total" class="text-2xl font-bold">0</p>
+                    <p class="text-xs text-gray-500 font-bold uppercase">จุดทั้งหมด</p>
+                    <p id="stat-total" class="text-3xl font-bold">0</p>
                 </div>
                 <div class="stat-card">
-                    <p class="text-xs text-orange-500 uppercase font-bold">รอตรวจสอบ</p>
-                    <p id="stat-pending" class="text-2xl font-bold text-orange-500">0</p>
+                    <p class="text-xs text-orange-500 font-bold uppercase">รอตรวจสอบ</p>
+                    <p id="stat-pending" class="text-3xl font-bold text-orange-500">0</p>
                 </div>
                 <div class="stat-card">
-                    <p class="text-xs text-green-500 uppercase font-bold">อนุมัติแล้ว</p>
-                    <p id="stat-approved" class="text-2xl font-bold text-green-500">0</p>
+                    <p class="text-xs text-green-500 font-bold uppercase">อนุมัติแล้ว</p>
+                    <p id="stat-approved" class="text-3xl font-bold text-green-500">0</p>
                 </div>
                 <div class="stat-card">
-                    <p class="text-xs text-blue-500 uppercase font-bold">พื้นที่ครอบคลุม</p>
-                    <p id="stat-districts" class="text-2xl font-bold text-blue-500">0</p>
+                    <p class="text-xs text-blue-500 font-bold uppercase">พื้นที่ครอบคลุม</p>
+                    <p id="stat-districts" class="text-3xl font-bold text-blue-500">0</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h3 class="font-bold text-gray-700 mb-4 border-b pb-2">สรุปรายอำเภอ/จังหวัด</h3>
-                    <div id="area-stats-list" class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                        </div>
+                <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border">
+                    <h3 class="font-bold text-gray-700 mb-4 border-b pb-2"><i class="fa-solid fa-map-location-dot mr-2"></i>สรุปรายพื้นที่</h3>
+                    <div id="area-stats-list" class="space-y-3 max-h-[400px] overflow-y-auto pr-2"></div>
                 </div>
 
-                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-gray-700">รายการจุดติดตั้ง AED ทั้งหมด</h3>
-                        <button onclick="exportToCSV()" class="text-xs bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-colors">
-                            <i class="fa-solid fa-file-csv mr-1"></i> ส่งออก Excel
+                        <h3 class="font-bold text-gray-700"><i class="fa-solid fa-table-list mr-2"></i>จัดการข้อมูล</h3>
+                        <button onclick="exportToCSV()" class="text-xs bg-emerald-50 text-emerald-600 px-4 py-2 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-all font-bold">
+                            <i class="fa-solid fa-file-excel mr-1"></i> Export Excel (CSV)
                         </button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left">
-                            <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                            <thead class="bg-gray-50 text-[10px] uppercase text-gray-500">
                                 <tr>
                                     <th class="p-3">สถานที่</th>
                                     <th class="p-3">อำเภอ/จังหวัด</th>
                                     <th class="p-3">สถานะ</th>
-                                    <th class="p-3 text-right">จัดการ</th>
+                                    <th class="p-3 text-right">Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="admin-table-body" class="text-sm">
-                                </tbody>
+                            <tbody id="admin-table-body" class="text-xs"></tbody>
                         </table>
                     </div>
                 </div>
@@ -98,34 +117,35 @@
         </div>
     </div>
 
-    <div class="fixed bottom-6 left-0 right-0 z-[1000] flex justify-center pointer-events-none">
-        <button onclick="toggleAddMode()" class="pointer-events-auto bg-green-600 text-white px-6 py-3.5 rounded-full shadow-xl font-bold flex items-center gap-2 active:scale-95 transition-transform">
-            <i class="fa-solid fa-plus text-lg"></i> แจ้งจุดติดตั้ง AED
-        </button>
-    </div>
-
     <div id="add-modal" class="hidden fixed inset-0 z-[2000] bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-6">
+        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-gray-800">เพิ่มจุด AED ใหม่</h2>
-                <button onclick="closeModal()" class="text-gray-400 text-2xl">×</button>
+                <button onclick="closeModal()" class="text-gray-400 text-3xl">&times;</button>
             </div>
             <form id="aed-form" onsubmit="saveAED(event)">
                 <div class="mb-4">
-                    <button type="button" onclick="useCurrentLocationForAdd()" class="w-full bg-blue-600 text-white py-3 rounded-xl shadow-md mb-2 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-location-crosshairs"></i> ใช้พิกัดปัจจุบันจาก GPS
+                    <button type="button" onclick="useCurrentLocationForAdd()" class="w-full bg-blue-600 text-white py-4 rounded-xl shadow-md mb-2 flex items-center justify-center gap-2 font-bold active:scale-95 transition-all">
+                        <i class="fa-solid fa-location-crosshairs"></i> ดึงพิกัดจากตำแหน่งที่คุณยืนอยู่
                     </button>
-                    <p id="gps-status" class="text-[10px] text-center text-gray-400">พิกัดจะระบุอัตโนมัติเมื่อส่งข้อมูล</p>
+                    <p id="gps-status" class="text-[10px] text-center text-gray-400">พิกัดจะระบุอัตโนมัติเมื่อกดปุ่มข้างต้นหรือปักหมุดบนแผนที่</p>
                 </div>
-                <input type="text" id="location-name" required class="w-full px-4 py-3 border rounded-xl bg-gray-50 mb-3" placeholder="ชื่อสถานที่ (เช่น รพ.สต.บ้านสวน)">
-                <textarea id="location-detail" required rows="2" class="w-full px-4 py-3 border rounded-xl bg-gray-50 mb-4" placeholder="รายละเอียด (เช่น หน้าเคาน์เตอร์ชั้น 1)"></textarea>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-1">ชื่อสถานที่/หน่วยงาน *</label>
+                    <input type="text" id="location-name" required class="w-full px-4 py-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-red-400 outline-none" placeholder="เช่น เทศบาลเมืองชลบุรี">
+                </div>
+                <div class="mb-5">
+                    <label class="block text-gray-700 text-sm font-bold mb-1">รายละเอียดตำแหน่งติดตั้ง *</label>
+                    <textarea id="location-detail" required rows="2" class="w-full px-4 py-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-red-400 outline-none" placeholder="เช่น ชั้น 1 อาคารกองช่าง ข้างตู้ยาม"></textarea>
+                </div>
                 <input type="hidden" id="lat-input"><input type="hidden" id="lng-input">
-                <button type="submit" id="save-btn" class="w-full bg-red-500 text-white font-bold py-3.5 rounded-xl shadow-lg">ส่งข้อมูลให้เจ้าหน้าที่ตรวจสอบ</button>
+                <button type="submit" id="save-btn" class="w-full bg-red-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-red-600 transition-colors">ส่งข้อมูลให้เจ้าหน้าที่ตรวจสอบ</button>
             </form>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
@@ -146,9 +166,9 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        let map, currentUser = null, isAddMode = false, markersLayer = L.layerGroup(), allData = [];
+        let map, userMarker, tempMarker, currentUser = null, isAddMode = false, markersLayer = L.layerGroup(), allData = [];
 
-        Object.assign(window, { toggleAdminView, toggleAddMode, closeModal, saveAED, approveAED, deleteAED, loginWithGoogle, logout, useCurrentLocationForAdd, exportToCSV });
+        Object.assign(window, { toggleAdminView, toggleAddMode, closeModal, saveAED, approveAED, deleteAED, loginWithGoogle, logout, useCurrentLocationForAdd, exportToCSV, locateUser });
 
         window.onload = () => { initMap(); initAuth(); };
 
@@ -161,7 +181,10 @@
                 document.getElementById('lat-input').value = e.latlng.lat;
                 document.getElementById('lng-input').value = e.latlng.lng;
                 document.getElementById('add-modal').classList.remove('hidden');
+                if(tempMarker) map.removeLayer(tempMarker);
+                tempMarker = L.marker(e.latlng).addTo(map);
             });
+            locateUser();
         }
 
         async function initAuth() {
@@ -170,11 +193,11 @@
                 currentUser = user;
                 if (user) {
                     const isAdmin = user.uid === ADMIN_UID;
-                    badge.innerHTML = isAdmin ? 'Admin Online' : `${user.displayName.split(' ')[0]}: Logout`;
+                    badge.innerHTML = isAdmin ? '<i class="fa-solid fa-user-shield"></i> Admin: Logout' : `<i class="fa-solid fa-user"></i> ${user.displayName.split(' ')[0]}`;
                     badge.onclick = logout;
                     if(isAdmin) document.getElementById('admin-entry-btn').classList.remove('hidden');
                 } else {
-                    badge.innerHTML = 'Login เพื่อเพิ่มจุด';
+                    badge.innerHTML = '<i class="fa-solid fa-lock"></i> คลิกเพื่อ Login';
                     badge.onclick = loginWithGoogle;
                 }
                 setupDataListener();
@@ -182,7 +205,7 @@
         }
 
         async function loginWithGoogle() { await signInWithPopup(auth, new GoogleAuthProvider()); }
-        async function logout() { if(confirm("ออกจากระบบ?")) await signOut(auth); window.location.reload(); }
+        async function logout() { if(confirm("ต้องการออกจากระบบใช่หรือไม่?")) await signOut(auth); window.location.reload(); }
 
         function setupDataListener() {
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'));
@@ -190,8 +213,6 @@
                 allData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderMarkers(allData);
                 if(currentUser && currentUser.uid === ADMIN_UID) updateAdminDashboard(allData);
-                document.body.classList.add('loaded');
-                document.getElementById('status-badge').innerHTML += " (Live)";
             });
         }
 
@@ -208,52 +229,78 @@
                         iconSize: [40, 40], iconAnchor: [20, 20], popupAnchor: [0, -25]
                     })
                 });
-                marker.bindPopup(`<div class="p-1 font-kanit"><h3 class="font-bold">${p.name}</h3><p class="text-xs text-gray-500">${p.detail}</p><p class="text-[10px] text-blue-500 mt-1">${p.district || ''}, ${p.province || ''}</p></div>`);
+                marker.bindPopup(`<div class="p-1 font-kanit"><h3 class="font-bold text-gray-800">${p.name}</h3><p class="text-[11px] text-gray-500 mb-2">${p.detail}</p><a href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" class="block w-full bg-blue-600 text-white text-center py-2 rounded-lg text-[10px] font-bold">นำทางผ่าน Google Maps</a></div>`, { className: 'custom-popup' });
                 markersLayer.addLayer(marker);
             });
         }
 
-        async function useCurrentLocationForAdd() {
+        function locateUser() {
+            if (!navigator.geolocation) return alert("เบราว์เซอร์ไม่รองรับ GPS");
             navigator.geolocation.getCurrentPosition((pos) => {
-                document.getElementById('lat-input').value = pos.coords.latitude;
-                document.getElementById('lng-input').value = pos.coords.longitude;
-                document.getElementById('gps-status').innerText = "📍 GPS Fixed!";
-            });
+                const { latitude, longitude } = pos.coords;
+                map.setView([latitude, longitude], 17);
+                if (userMarker) map.removeLayer(userMarker);
+                userMarker = L.marker([latitude, longitude], { 
+                    icon: L.divIcon({ className: 'user-pin', iconSize: [20, 20], iconAnchor: [10, 10] }) 
+                }).addTo(map);
+            }, () => alert("ไม่สามารถดึงตำแหน่งได้"), { enableHighAccuracy: true });
+        }
+
+        async function useCurrentLocationForAdd() {
+            const statusText = document.getElementById('gps-status');
+            statusText.innerText = "📍 กำลังระบุตำแหน่ง...";
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const { latitude, longitude } = pos.coords;
+                document.getElementById('lat-input').value = latitude;
+                document.getElementById('lng-input').value = longitude;
+                map.setView([latitude, longitude], 18);
+                if (tempMarker) map.removeLayer(tempMarker);
+                tempMarker = L.marker([latitude, longitude]).addTo(map);
+                statusText.innerText = "✅ GPS ระบุตำแหน่งสำเร็จ!";
+                statusText.className = "text-[10px] text-green-600 font-bold";
+            }, () => alert("กรุณาเปิด GPS"), { enableHighAccuracy: true });
         }
 
         async function saveAED(e) {
             e.preventDefault();
+            const btn = document.getElementById('save-btn');
             const lat = parseFloat(document.getElementById('lat-input').value);
             const lng = parseFloat(document.getElementById('lng-input').value);
+
+            if(!lat || !lng) return alert("กรุณาระบุตำแหน่งบนแผนที่ก่อนครับ");
+
+            btn.disabled = true; btn.innerText = "กำลังบันทึกและตรวจสอบพื้นที่...";
             
-            // ดึงชื่ออำเภอ/จังหวัด อัตโนมัติจากพิกัด (Reverse Geocoding)
-            let district = "ไม่ทราบข้อมูล", province = "ไม่ทราบข้อมูล";
+            let district = "ไม่ทราบ", province = "ไม่ทราบ";
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`);
                 const json = await res.json();
                 district = json.address.amphoe || json.address.district || district;
                 province = json.address.province || province;
-            } catch(e) { console.log("Geocoding failed"); }
+            } catch(e) { console.warn("Geocoding delay"); }
 
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'), {
-                name: document.getElementById('location-name').value,
-                detail: document.getElementById('location-detail').value,
-                lat, lng, district, province,
-                status: 'pending',
-                createdBy: currentUser.uid,
-                creatorName: currentUser.displayName,
-                timestamp: serverTimestamp()
-            });
-            alert("ส่งข้อมูลสำเร็จ! ขอบคุณครับ");
-            closeModal();
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'), {
+                    name: document.getElementById('location-name').value,
+                    detail: document.getElementById('location-detail').value,
+                    lat, lng, district, province,
+                    status: 'pending',
+                    createdBy: currentUser.uid,
+                    creatorName: currentUser.displayName,
+                    timestamp: serverTimestamp()
+                });
+                alert("ส่งข้อมูลเรียบร้อยแล้ว! เจ้าหน้าที่จะตรวจสอบเพื่ออนุมัติโดยเร็วที่สุด");
+                closeModal();
+            } catch(err) { alert(err.message); }
+            btn.disabled = false; btn.innerText = "ส่งข้อมูลให้เจ้าหน้าที่ตรวจสอบ";
         }
 
         function updateAdminDashboard(data) {
             const stats = data.reduce((acc, curr) => {
                 acc.total++;
                 acc[curr.status === 'approved' ? 'approved' : 'pending']++;
-                const area = `${curr.province} - ${curr.district}`;
-                acc.areas[area] = (acc.areas[area] || 0) + 1;
+                const areaKey = `${curr.province} - ${curr.district}`;
+                acc.areas[areaKey] = (acc.areas[areaKey] || 0) + 1;
                 return acc;
             }, { total: 0, pending: 0, approved: 0, areas: {} });
 
@@ -264,21 +311,21 @@
 
             let areaHtml = "";
             Object.entries(stats.areas).sort((a,b) => b[1] - a[1]).forEach(([name, count]) => {
-                areaHtml += `<div class="flex justify-between items-center text-sm border-b pb-1"><span>${name}</span><span class="font-bold text-red-600">${count} จุด</span></div>`;
+                areaHtml += `<div class="flex justify-between items-center text-xs border-b pb-2"><span>${name}</span><span class="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">${count} จุด</span></div>`;
             });
             document.getElementById('area-stats-list').innerHTML = areaHtml;
 
             let tableHtml = "";
             data.forEach(p => {
                 tableHtml += `
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="p-3"><p class="font-bold">${p.name}</p><p class="text-[10px] text-gray-400">${p.creatorName}</p></td>
-                        <td class="p-3 text-xs">${p.district}<br>${p.province}</td>
-                        <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">${p.status}</span></td>
+                    <tr class="border-b hover:bg-gray-50 transition-colors">
+                        <td class="p-3"><p class="font-bold text-gray-800">${p.name}</p><p class="text-[9px] text-gray-400">${p.creatorName}</p></td>
+                        <td class="p-3 text-[10px]">${p.district}<br><span class="text-gray-400">${p.province}</span></td>
+                        <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">${p.status.toUpperCase()}</span></td>
                         <td class="p-3 text-right">
-                            <div class="flex justify-end gap-2">
-                                ${p.status === 'pending' ? `<button onclick="approveAED('${p.id}')" class="text-green-500 hover:scale-110"><i class="fa-solid fa-circle-check"></i></button>` : ''}
-                                <button onclick="deleteAED('${p.id}')" class="text-red-400 hover:scale-110"><i class="fa-solid fa-trash"></i></button>
+                            <div class="flex justify-end gap-3">
+                                ${p.status === 'pending' ? `<button onclick="approveAED('${p.id}')" class="text-green-500 hover:scale-125 transition-transform"><i class="fa-solid fa-square-check text-lg"></i></button>` : ''}
+                                <button onclick="deleteAED('${p.id}')" class="text-red-300 hover:text-red-600 transition-colors"><i class="fa-solid fa-trash-can"></i></button>
                             </div>
                         </td>
                     </tr>`;
@@ -286,26 +333,24 @@
             document.getElementById('admin-table-body').innerHTML = tableHtml;
         }
 
-        async function approveAED(id) { if(confirm("อนุมัติจุดนี้?")) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id), { status: 'approved' }); }
-        async function deleteAED(id) { if(confirm("ลบจุดนี้ถาวร?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id)); }
+        async function approveAED(id) { if(confirm("ยืนยันการอนุมัติจุดติดตั้งนี้?")) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id), { status: 'approved' }); }
+        async function deleteAED(id) { if(confirm("ลบจุดนี้ถาวร? ข้อมูลไม่สามารถกู้คืนได้")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id)); }
 
         function toggleAdminView() {
             const panel = document.getElementById('admin-view');
             panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
         }
 
-        function toggleAddMode() { if(!currentUser) { loginWithGoogle(); return; } isAddMode = true; alert("แตะที่แผนที่เพื่อระบุตำแหน่ง"); }
-        function closeModal() { document.getElementById('add-modal').classList.add('hidden'); isAddMode = false; }
+        function toggleAddMode() { if(!currentUser) { loginWithGoogle(); return; } isAddMode = true; alert("แตะที่ตำแหน่งบนแผนที่เพื่อปักหมุด หรือกดปุ่มใช้ GPS ในหน้าถัดไปครับ"); }
+        function closeModal() { document.getElementById('add-modal').classList.add('hidden'); isAddMode = false; if(tempMarker) map.removeLayer(tempMarker); }
 
         function exportToCSV() {
-            let csv = "ชื่อสถานที่,รายละเอียด,อำเภอ,จังหวัด,พิกัด(Lat),พิกัด(Lng),ผู้แจ้ง,สถานะ\n";
-            allData.forEach(p => {
-                csv += `"${p.name}","${p.detail}","${p.district}","${p.province}",${p.lat},${p.lng},"${p.creatorName}","${p.status}"\n`;
-            });
+            let csv = "สถานที่,รายละเอียด,อำเภอ,จังหวัด,พิกัด(Lat),พิกัด(Lng),ผู้แจ้ง,สถานะ\n";
+            allData.forEach(p => { csv += `"${p.name}","${p.detail}","${p.district}","${p.province}",${p.lat},${p.lng},"${p.creatorName}","${p.status}"\n`; });
             const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `AED_Report_${new Date().toLocaleDateString()}.csv`;
+            link.download = `AED_Report_${new Date().toLocaleDateString('th-TH')}.csv`;
             link.click();
         }
     </script>
