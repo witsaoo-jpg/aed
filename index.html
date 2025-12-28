@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AED Map Thailand - Final Professional Edition</title>
+    <title>AED Map Thailand - Admin Master Edition</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -62,7 +62,7 @@
             <div class="flex justify-between items-center mb-6">
                 <div>
                     <h2 class="text-2xl font-bold text-gray-800">ระบบบริหารจัดการข้อมูล AED</h2>
-                    <p class="text-sm text-gray-500">สำหรับตรวจสอบและส่งออกรายงาน (Admin Only)</p>
+                    <p class="text-sm text-gray-500">สำหรับเจ้าหน้าที่: อนุมัติและตรวจสอบรายงาน</p>
                 </div>
                 <button onclick="toggleAdminView()" class="bg-white border w-10 h-10 rounded-full shadow-sm hover:bg-gray-50 text-xl font-bold">×</button>
             </div>
@@ -94,7 +94,7 @@
 
                 <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-gray-700"><i class="fa-solid fa-table-list mr-2"></i>จัดการข้อมูล</h3>
+                        <h3 class="font-bold text-gray-700"><i class="fa-solid fa-table-list mr-2"></i>จัดการและอนุมัติข้อมูล</h3>
                         <button onclick="exportToCSV()" class="text-xs bg-emerald-50 text-emerald-600 px-4 py-2 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-all font-bold">
                             <i class="fa-solid fa-file-excel mr-1"></i> Export Excel (CSV)
                         </button>
@@ -104,9 +104,9 @@
                             <thead class="bg-gray-50 text-[10px] uppercase text-gray-500">
                                 <tr>
                                     <th class="p-3">สถานที่</th>
-                                    <th class="p-3">อำเภอ/จังหวัด</th>
+                                    <th class="p-3">พื้นที่</th>
                                     <th class="p-3">สถานะ</th>
-                                    <th class="p-3 text-right">Action</th>
+                                    <th class="p-3 text-right">ACTION</th>
                                 </tr>
                             </thead>
                             <tbody id="admin-table-body" class="text-xs"></tbody>
@@ -121,22 +121,22 @@
         <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-gray-800">เพิ่มจุด AED ใหม่</h2>
-                <button onclick="closeModal()" class="text-gray-400 text-3xl">&times;</button>
+                <button onclick="closeModal()" class="text-gray-400 text-3xl">×</button>
             </div>
             <form id="aed-form" onsubmit="saveAED(event)">
                 <div class="mb-4">
                     <button type="button" onclick="useCurrentLocationForAdd()" class="w-full bg-blue-600 text-white py-4 rounded-xl shadow-md mb-2 flex items-center justify-center gap-2 font-bold active:scale-95 transition-all">
-                        <i class="fa-solid fa-location-crosshairs"></i> ดึงพิกัดจากตำแหน่งที่คุณยืนอยู่
+                        <i class="fa-solid fa-location-crosshairs"></i> ดึงพิกัดจากตำแหน่งปัจจุบัน
                     </button>
-                    <p id="gps-status" class="text-[10px] text-center text-gray-400">พิกัดจะระบุอัตโนมัติเมื่อกดปุ่มข้างต้นหรือปักหมุดบนแผนที่</p>
+                    <p id="gps-status" class="text-[10px] text-center text-gray-400 italic">หรือปักหมุดบนแผนที่เพื่อระบุตำแหน่ง</p>
                 </div>
                 <div class="mb-4">
                     <label class="block text-gray-700 text-sm font-bold mb-1">ชื่อสถานที่/หน่วยงาน *</label>
-                    <input type="text" id="location-name" required class="w-full px-4 py-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-red-400 outline-none" placeholder="เช่น เทศบาลเมืองชลบุรี">
+                    <input type="text" id="location-name" required class="w-full px-4 py-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-red-400 outline-none">
                 </div>
                 <div class="mb-5">
                     <label class="block text-gray-700 text-sm font-bold mb-1">รายละเอียดตำแหน่งติดตั้ง *</label>
-                    <textarea id="location-detail" required rows="2" class="w-full px-4 py-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-red-400 outline-none" placeholder="เช่น ชั้น 1 อาคารกองช่าง ข้างตู้ยาม"></textarea>
+                    <textarea id="location-detail" required rows="2" class="w-full px-4 py-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-red-400 outline-none"></textarea>
                 </div>
                 <input type="hidden" id="lat-input"><input type="hidden" id="lng-input">
                 <button type="submit" id="save-btn" class="w-full bg-red-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-red-600 transition-colors">ส่งข้อมูลให้เจ้าหน้าที่ตรวจสอบ</button>
@@ -151,6 +151,7 @@
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, updateDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
+        // --- Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyDp0HC7Wh2fH13XbMXrzvrFSQpB3q0breI",
             authDomain: "aed-map-th-488a6.firebaseapp.com",
@@ -160,7 +161,7 @@
             appId: "1:264816215714:web:92494e9281eed1f7e5f9fb"
         };
         
-        const ADMIN_UID = "92k0JYOorjZu48FaAMDgPvFPr0i2";
+        const ADMIN_UID = "92k0JYOorjZu48FaAMDgPvFPr0i2"; //
         const appId = 'aed-map-th-488a6';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -193,7 +194,7 @@
                 currentUser = user;
                 if (user) {
                     const isAdmin = user.uid === ADMIN_UID;
-                    badge.innerHTML = isAdmin ? '<i class="fa-solid fa-user-shield"></i> Admin: Logout' : `<i class="fa-solid fa-user"></i> ${user.displayName.split(' ')[0]}`;
+                    badge.innerHTML = isAdmin ? '<i class="fa-solid fa-user-shield"></i> Admin: Online' : `<i class="fa-solid fa-user"></i> ${user.displayName.split(' ')[0]}`; //
                     badge.onclick = logout;
                     if(isAdmin) document.getElementById('admin-entry-btn').classList.remove('hidden');
                 } else {
@@ -229,7 +230,23 @@
                         iconSize: [40, 40], iconAnchor: [20, 20], popupAnchor: [0, -25]
                     })
                 });
-                marker.bindPopup(`<div class="p-1 font-kanit"><h3 class="font-bold text-gray-800">${p.name}</h3><p class="text-[11px] text-gray-500 mb-2">${p.detail}</p><a href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" class="block w-full bg-blue-600 text-white text-center py-2 rounded-lg text-[10px] font-bold">นำทางผ่าน Google Maps</a></div>`, { className: 'custom-popup' });
+
+                let popupHtml = `
+                    <div class="p-1 font-kanit">
+                        <h3 class="font-bold text-gray-800">${p.name} ${isPending ? '<span class="text-orange-500 text-xs">(รอตรวจสอบ)</span>' : ''}</h3>
+                        <p class="text-[11px] text-gray-500 mb-2">${p.detail}</p>
+                        <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank" class="block w-full bg-blue-600 text-white text-center py-2 rounded-lg text-[10px] font-bold mb-1">นำทาง (Google Maps)</a>`;
+                
+                // --- เพิ่มปุ่มอนุมัติใน Popup สำหรับ Admin ---
+                if (isAdmin && isPending) {
+                    popupHtml += `<button onclick="approveAED('${p.id}')" class="w-full bg-green-500 text-white py-2 rounded-lg text-[10px] font-bold mb-1"><i class="fa-solid fa-check mr-1"></i> อนุมัติจุดนี้</button>`;
+                }
+                if (isAdmin) {
+                    popupHtml += `<button onclick="deleteAED('${p.id}')" class="w-full bg-red-100 text-red-600 py-1.5 rounded-lg text-[9px] font-bold">ลบจุดนี้</button>`;
+                }
+
+                popupHtml += `</div>`;
+                marker.bindPopup(popupHtml, { className: 'custom-popup' });
                 markersLayer.addLayer(marker);
             });
         }
@@ -243,7 +260,7 @@
                 userMarker = L.marker([latitude, longitude], { 
                     icon: L.divIcon({ className: 'user-pin', iconSize: [20, 20], iconAnchor: [10, 10] }) 
                 }).addTo(map);
-            }, () => alert("ไม่สามารถดึงตำแหน่งได้"), { enableHighAccuracy: true });
+            }, () => alert("ไม่สามารถดึงตำแหน่งปัจจุบันได้"), { enableHighAccuracy: true });
         }
 
         async function useCurrentLocationForAdd() {
@@ -256,7 +273,7 @@
                 map.setView([latitude, longitude], 18);
                 if (tempMarker) map.removeLayer(tempMarker);
                 tempMarker = L.marker([latitude, longitude]).addTo(map);
-                statusText.innerText = "✅ GPS ระบุตำแหน่งสำเร็จ!";
+                statusText.innerText = "✅ ดึงพิกัด GPS สำเร็จ!";
                 statusText.className = "text-[10px] text-green-600 font-bold";
             }, () => alert("กรุณาเปิด GPS"), { enableHighAccuracy: true });
         }
@@ -269,9 +286,9 @@
 
             if(!lat || !lng) return alert("กรุณาระบุตำแหน่งบนแผนที่ก่อนครับ");
 
-            btn.disabled = true; btn.innerText = "กำลังบันทึกและตรวจสอบพื้นที่...";
+            btn.disabled = true; btn.innerText = "กำลังบันทึกข้อมูล...";
             
-            let district = "ไม่ทราบ", province = "ไม่ทราบ";
+            let district = "ไม่ระบุ", province = "ไม่ระบุ";
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`);
                 const json = await res.json();
@@ -289,7 +306,7 @@
                     creatorName: currentUser.displayName,
                     timestamp: serverTimestamp()
                 });
-                alert("ส่งข้อมูลเรียบร้อยแล้ว! เจ้าหน้าที่จะตรวจสอบเพื่ออนุมัติโดยเร็วที่สุด");
+                alert("ส่งข้อมูลสำเร็จ! รอเจ้าหน้าที่ตรวจสอบเพื่ออนุมัติครับ");
                 closeModal();
             } catch(err) { alert(err.message); }
             btn.disabled = false; btn.innerText = "ส่งข้อมูลให้เจ้าหน้าที่ตรวจสอบ";
@@ -299,7 +316,7 @@
             const stats = data.reduce((acc, curr) => {
                 acc.total++;
                 acc[curr.status === 'approved' ? 'approved' : 'pending']++;
-                const areaKey = `${curr.province} - ${curr.district}`;
+                const areaKey = `${curr.province || 'ไม่ระบุ'} - ${curr.district || 'ไม่ระบุ'}`;
                 acc.areas[areaKey] = (acc.areas[areaKey] || 0) + 1;
                 return acc;
             }, { total: 0, pending: 0, approved: 0, areas: {} });
@@ -319,13 +336,13 @@
             data.forEach(p => {
                 tableHtml += `
                     <tr class="border-b hover:bg-gray-50 transition-colors">
-                        <td class="p-3"><p class="font-bold text-gray-800">${p.name}</p><p class="text-[9px] text-gray-400">${p.creatorName}</p></td>
+                        <td class="p-3"><p class="font-bold text-gray-800">${p.name}</p><p class="text-[9px] text-gray-400">${p.creatorName || 'Anonymous'}</p></td>
                         <td class="p-3 text-[10px]">${p.district}<br><span class="text-gray-400">${p.province}</span></td>
                         <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">${p.status.toUpperCase()}</span></td>
                         <td class="p-3 text-right">
                             <div class="flex justify-end gap-3">
-                                ${p.status === 'pending' ? `<button onclick="approveAED('${p.id}')" class="text-green-500 hover:scale-125 transition-transform"><i class="fa-solid fa-square-check text-lg"></i></button>` : ''}
-                                <button onclick="deleteAED('${p.id}')" class="text-red-300 hover:text-red-600 transition-colors"><i class="fa-solid fa-trash-can"></i></button>
+                                ${p.status === 'pending' ? `<button onclick="approveAED('${p.id}')" title="อนุมัติ" class="text-green-500 hover:scale-125 transition-transform"><i class="fa-solid fa-circle-check text-lg"></i></button>` : `<i class="fa-solid fa-circle-check text-gray-200 text-lg"></i>`}
+                                <button onclick="deleteAED('${p.id}')" title="ลบ" class="text-red-300 hover:text-red-600 transition-colors"><i class="fa-solid fa-trash-can text-lg"></i></button>
                             </div>
                         </td>
                     </tr>`;
@@ -333,15 +350,15 @@
             document.getElementById('admin-table-body').innerHTML = tableHtml;
         }
 
-        async function approveAED(id) { if(confirm("ยืนยันการอนุมัติจุดติดตั้งนี้?")) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id), { status: 'approved' }); }
-        async function deleteAED(id) { if(confirm("ลบจุดนี้ถาวร? ข้อมูลไม่สามารถกู้คืนได้")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id)); }
+        async function approveAED(id) { if(confirm("ยืนยันการอนุมัติจุดติดตั้งนี้ให้ปรากฏสู่สาธารณะ?")) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id), { status: 'approved' }); }
+        async function deleteAED(id) { if(confirm("ต้องการลบจุดนี้ถาวรใช่หรือไม่? ข้อมูลไม่สามารถกู้คืนได้")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id)); }
 
         function toggleAdminView() {
             const panel = document.getElementById('admin-view');
             panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
         }
 
-        function toggleAddMode() { if(!currentUser) { loginWithGoogle(); return; } isAddMode = true; alert("แตะที่ตำแหน่งบนแผนที่เพื่อปักหมุด หรือกดปุ่มใช้ GPS ในหน้าถัดไปครับ"); }
+        function toggleAddMode() { if(!currentUser) { loginWithGoogle(); return; } isAddMode = true; alert("แตะที่ตำแหน่งบนแผนที่เพื่อปักหมุด หรือกดปุ่มดึงพิกัดจาก GPS ครับ"); }
         function closeModal() { document.getElementById('add-modal').classList.add('hidden'); isAddMode = false; if(tempMarker) map.removeLayer(tempMarker); }
 
         function exportToCSV() {
@@ -350,7 +367,7 @@
             const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `AED_Report_${new Date().toLocaleDateString('th-TH')}.csv`;
+            link.download = `Report_AED_Map_${new Date().toLocaleDateString('th-TH')}.csv`;
             link.click();
         }
     </script>
