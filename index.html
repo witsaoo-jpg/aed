@@ -147,242 +147,244 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, updateDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, updateDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDp0HC7Wh2fH13XbMXrzvrFSQpB3q0breI",
-            authDomain: "aed-map-th-488a6.firebaseapp.com",
-            projectId: "aed-map-th-488a6",
-            storageBucket: "aed-map-th-488a6.firebasestorage.app",
-            messagingSenderId: "264816215714",
-            appId: "1:264816215714:web:92494e9281eed1f7e5f9fb"
-        };
-        
-        const ADMIN_UID = "92k0JYOorjZu48FaAMDgPvFPr0i2";
-        const appId = 'aed-map-th-488a6';
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        let map, userMarker, tempMarker, currentUser = null, isAddMode = false, markersLayer = L.layerGroup(), allData = [];
-
-        Object.assign(window, { toggleAdminView, toggleAddMode, closeModal, saveAED, approveAED, deleteAED, loginWithGoogle, logout, useCurrentLocationForAdd, exportToCSV, locateUser });
-
-        window.onload = () => { initMap(); initAuth(); };
-
-        function initMap() {
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([13.7649, 100.5383], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            markersLayer.addTo(map);
-            map.on('click', (e) => {
-                if(!isAddMode) return;
-                document.getElementById('lat-input').value = e.latlng.lat;
-                document.getElementById('lng-input').value = e.latlng.lng;
-                document.getElementById('add-modal').classList.remove('hidden');
-                if(tempMarker) map.removeLayer(tempMarker);
-                tempMarker = L.marker(e.latlng).addTo(map);
-            });
-            locateUser();
-        }
-
-        async function initAuth() {
-            onAuthStateChanged(auth, (user) => {
-                const badge = document.getElementById('status-badge');
-                currentUser = user;
-                if (user) {
-                    const isAdmin = user.uid === ADMIN_UID;
-                    badge.innerHTML = isAdmin ? '<i class="fa-solid fa-user-shield"></i> Admin: Online' : `<i class="fa-solid fa-user"></i> ${user.displayName.split(' ')[0]}`;
-                    badge.onclick = logout;
-                    if(isAdmin) document.getElementById('admin-entry-btn').classList.remove('hidden');
-                } else {
-                    badge.innerHTML = '<i class="fa-solid fa-lock"></i> คลิกเพื่อ Login';
-                    badge.onclick = loginWithGoogle;
-                }
-                setupDataListener();
-            });
-        }
-
-        async function loginWithGoogle() { await signInWithPopup(auth, new GoogleAuthProvider()); }
-        async function logout() { if(confirm("ต้องการออกจากระบบ?")) await signOut(auth); window.location.reload(); }
-
-        function setupDataListener() {
-            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'));
-            onSnapshot(q, (snapshot) => {
-                allData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderMarkers(allData);
-                if(currentUser && currentUser.uid === ADMIN_UID) updateAdminDashboard(allData);
-            });
-        }
-
-        function renderMarkers(data) {
-            markersLayer.clearLayers();
-            const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
-            data.forEach(p => {
-                if(!isAdmin && p.status !== 'approved') return;
-                const isPending = p.status === 'pending';
-                const marker = L.marker([p.lat, p.lng], {
-                    icon: L.divIcon({
-                        className: 'custom-div-icon',
-                        html: `<div class='w-10 h-10 ${isPending ? "aed-marker-pending" : "aed-marker-approved"}'><i class='fa-solid fa-heart-pulse'></i></div>`,
-                        iconSize: [40, 40], iconAnchor: [20, 20], popupAnchor: [0, -25]
-                    })
-                });
-
-                let popupHtml = `
-                    <div class="p-1 font-kanit">
-                        <h3 class="font-bold text-gray-800">${p.name} ${isPending ? '<span class="text-orange-500 text-xs">(รอตรวจสอบ)</span>' : ''}</h3>
-                        <p class="text-[11px] text-gray-500 mb-2">${p.detail}</p>
-                        <a href="http://googleusercontent.com/maps.google.com/4{p.lat},${p.lng}" target="_blank" class="block w-full bg-blue-600 text-white text-center py-2 rounded-lg text-[10px] font-bold mb-1">นำทาง (Google Maps)</a>`;
-                
-                if (isAdmin && isPending) {
-                    popupHtml += `<button onclick="approveAED('${p.id}')" class="w-full bg-green-500 text-white py-2 rounded-lg text-[10px] font-bold mb-1"><i class="fa-solid fa-check mr-1"></i> อนุมัติจุดนี้</button>`;
-                }
-                if (isAdmin) {
-                    popupHtml += `<button onclick="deleteAED('${p.id}')" class="w-full bg-red-100 text-red-600 py-1.5 rounded-lg text-[9px] font-bold">ลบจุดนี้</button>`;
-                }
-
-                popupHtml += `</div>`;
-                marker.bindPopup(popupHtml, { className: 'custom-popup' });
-                markersLayer.addLayer(marker);
-            });
-        }
-
-        function locateUser() {
-            navigator.geolocation.getCurrentPosition((pos) => {
-                const { latitude, longitude } = pos.coords;
-                map.setView([latitude, longitude], 17);
-                if (userMarker) map.removeLayer(userMarker);
-                userMarker = L.marker([latitude, longitude], { 
-                    icon: L.divIcon({ className: 'user-pin', iconSize: [20, 20], iconAnchor: [10, 10] }) 
-                }).addTo(map);
-            }, null, { enableHighAccuracy: true });
-        }
-
-        async function useCurrentLocationForAdd() {
-            const statusText = document.getElementById('gps-status');
-            statusText.innerText = "📍 กำลังดึงพิกัด GPS...";
-            navigator.geolocation.getCurrentPosition((pos) => {
-                const { latitude, longitude } = pos.coords;
-                document.getElementById('lat-input').value = latitude;
-                document.getElementById('lng-input').value = longitude;
-                map.setView([latitude, longitude], 18);
-                if (tempMarker) map.removeLayer(tempMarker);
-                tempMarker = L.marker([latitude, longitude]).addTo(map);
-                statusText.innerText = "✅ ดึงพิกัดสำเร็จ!";
-                statusText.className = "text-[10px] text-green-600 font-bold";
-            }, () => alert("กรุณาเปิด GPS"), { enableHighAccuracy: true });
-        }
-
-        async function saveAED(e) {
-            e.preventDefault();
-            const btn = document.getElementById('save-btn');
-            const lat = parseFloat(document.getElementById('lat-input').value);
-            const lng = parseFloat(document.getElementById('lng-input').value);
-
-            if(!lat || !lng) return alert("กรุณาระบุพิกัดก่อนครับ");
-
-            btn.disabled = true; btn.innerText = "กำลังประมวลผลพื้นที่...";
-            
-            // --- เช็คสิทธิ์ Admin เพื่อ Auto-approve ---
-            const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
-            const targetStatus = isAdmin ? 'approved' : 'pending';
-
-            let district = "ไม่ระบุ", province = "ไม่ระบุ";
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`);
-                const json = await res.json();
-                district = json.address.amphoe || json.address.district || district;
-                province = json.address.province || province;
-            } catch(e) { console.warn("Reverse Geocoding failed"); }
-
-            try {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'), {
-                    name: document.getElementById('location-name').value,
-                    detail: document.getElementById('location-detail').value,
-                    lat, lng, district, province,
-                    status: targetStatus, // ใช้ตัวแปรตามสิทธิ์
-                    createdBy: currentUser.uid,
-                    creatorName: currentUser.displayName,
-                    timestamp: serverTimestamp()
-                });
-                alert(isAdmin ? "บันทึกและอนุมัติจุดติดตั้งเรียบร้อยแล้ว!" : "ส่งข้อมูลสำเร็จ! รอเจ้าหน้าที่อนุมัติครับ");
-                closeModal();
-            } catch(err) { alert(err.message); }
-            btn.disabled = false; btn.innerText = "บันทึกข้อมูล";
-        }
-
-        function updateAdminDashboard(data) {
-            const stats = data.reduce((acc, curr) => {
-                acc.total++;
-                acc[curr.status === 'approved' ? 'approved' : 'pending']++;
-                const areaKey = `${curr.province || 'ไม่ระบุ'} - ${curr.district || 'ไม่ระบุ'}`;
-                acc.areas[areaKey] = (acc.areas[areaKey] || 0) + 1;
-                return acc;
-            }, { total: 0, pending: 0, approved: 0, areas: {} });
-
-            document.getElementById('stat-total').innerText = stats.total;
-            document.getElementById('stat-pending').innerText = stats.pending;
-            document.getElementById('stat-approved').innerText = stats.approved;
-            document.getElementById('stat-districts').innerText = Object.keys(stats.areas).length;
-
-            let areaHtml = "";
-            Object.entries(stats.areas).sort((a,b) => b[1] - a[1]).forEach(([name, count]) => {
-                areaHtml += `<div class="flex justify-between items-center text-xs border-b pb-2"><span>${name}</span><span class="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">${count}</span></div>`;
-            });
-            document.getElementById('area-stats-list').innerHTML = areaHtml;
-
-            let tableHtml = "";
-            data.forEach(p => {
-                tableHtml += `
-                    <tr class="border-b hover:bg-gray-50 transition-colors">
-                        <td class="p-3"><p class="font-bold text-gray-800">${p.name}</p><p class="text-[9px] text-gray-400">${p.creatorName || 'Anonymous'}</p></td>
-                        <td class="p-3 text-[10px]">${p.district}<br><span class="text-gray-400">${p.province}</span></td>
-                        <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">${p.status.toUpperCase()}</span></td>
-                        <td class="p-3 text-right">
-                            <div class="flex justify-end gap-3">
-                                ${p.status === 'pending' ? `<button onclick="approveAED('${p.id}')" class="text-green-500 hover:scale-125 transition-all"><i class="fa-solid fa-circle-check text-lg"></i></button>` : `<i class="fa-solid fa-circle-check text-gray-200 text-lg"></i>`}
-                                <button onclick="deleteAED('${p.id}')" class="text-red-300 hover:text-red-600 transition-all"><i class="fa-solid fa-trash-can text-lg"></i></button>
-                            </div>
-                        </td>
-                    </tr>`;
-            });
-            document.getElementById('admin-table-body').innerHTML = tableHtml;
-        }
-
-        async function approveAED(id) { if(confirm("อนุมัติจุดติดตั้งนี้ให้ปรากฏสู่สาธารณะ?")) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id), { status: 'approved' }); }
-        async function deleteAED(id) { if(confirm("ลบจุดนี้ถาวร? ข้อมูลไม่สามารถกู้คืนได้")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id)); }
-
-        function toggleAdminView() {
-            const panel = document.getElementById('admin-view');
-            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-        }
-
-       function toggleAddMode() {
-    // ถ้ายังไม่ Login ให้แจ้งเตือนและเรียกฟังก์ชัน Login
-    if (!currentUser) {
-        if (confirm("คุณต้องเข้าสู่ระบบก่อนจึงจะสามารถปักหมุดแจ้งพิกัดได้ ต้องการ Login หรือไม่?")) {
-            loginWithGoogle();
-        }
-        return; 
-    }
+    const firebaseConfig = {
+        apiKey: "AIzaSyDp0HC7Wh2fH13XbMXrzvrFSQpB3q0breI",
+        authDomain: "aed-map-th-488a6.firebaseapp.com",
+        projectId: "aed-map-th-488a6",
+        storageBucket: "aed-map-th-488a6.firebasestorage.app",
+        messagingSenderId: "264816215714",
+        appId: "1:264816215714:web:92494e9281eed1f7e5f9fb"
+    };
     
-    // ถ้า Login แล้วถึงจะยอมให้เปิดโหมดปักหมุด
-    isAddMode = true;
-    alert("แตะที่ตำแหน่งบนแผนที่เพื่อปักหมุดครับ");
-}
-        function closeModal() { document.getElementById('add-modal').classList.add('hidden'); isAddMode = false; if(tempMarker) map.removeLayer(tempMarker); }
+    const ADMIN_UID = "92k0JYOorjZu48FaAMDgPvFPr0i2";
+    const appId = 'aed-map-th-488a6';
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-        function exportToCSV() {
-            let csv = "สถานที่,รายละเอียด,อำเภอ,จังหวัด,พิกัด(Lat),พิกัด(Lng),ผู้แจ้ง,สถานะ\n";
-            allData.forEach(p => { csv += `"${p.name}","${p.detail}","${p.district}","${p.province}",${p.lat},${p.lng},"${p.creatorName}","${p.status}"\n`; });
-            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `Report_AED_Map_${new Date().toLocaleDateString('th-TH')}.csv`;
-            link.click();
+    let map, userMarker, tempMarker, currentUser = null, isAddMode = false, markersLayer = L.layerGroup(), allData = [];
+
+    // เชื่อมต่อฟังก์ชันเข้ากับ Window เพื่อให้เรียกใช้จาก HTML ได้
+    Object.assign(window, { toggleAdminView, toggleAddMode, closeModal, saveAED, approveAED, deleteAED, loginWithGoogle, logout, useCurrentLocationForAdd, exportToCSV, locateUser });
+
+    window.onload = () => { initMap(); initAuth(); };
+
+    function initMap() {
+        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([13.7649, 100.5383], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        markersLayer.addTo(map);
+        map.on('click', (e) => {
+            if(!isAddMode) return;
+            document.getElementById('lat-input').value = e.latlng.lat;
+            document.getElementById('lng-input').value = e.latlng.lng;
+            document.getElementById('add-modal').classList.remove('hidden');
+            if(tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker(e.latlng).addTo(map);
+        });
+        locateUser();
+    }
+
+    async function initAuth() {
+        onAuthStateChanged(auth, (user) => {
+            const badge = document.getElementById('status-badge');
+            currentUser = user;
+            if (user) {
+                const isAdmin = user.uid === ADMIN_UID;
+                badge.innerHTML = isAdmin ? '<i class="fa-solid fa-user-shield"></i> Admin: Online' : `<i class="fa-solid fa-user"></i> ${user.displayName.split(' ')[0]}`;
+                badge.onclick = logout;
+                if(isAdmin) document.getElementById('admin-entry-btn').classList.remove('hidden');
+            } else {
+                badge.innerHTML = '<i class="fa-solid fa-lock"></i> คลิกเพื่อ Login';
+                badge.onclick = loginWithGoogle;
+                document.getElementById('admin-entry-btn').classList.add('hidden');
+            }
+            // ดึงข้อมูลหมุดมาโชว์เสมอ ไม่ว่าจะ Login หรือไม่
+            setupDataListener();
+        });
+    }
+
+    async function loginWithGoogle() { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    async function logout() { if(confirm("ต้องการออกจากระบบ?")) await signOut(auth); window.location.reload(); }
+
+    function setupDataListener() {
+        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'));
+        onSnapshot(q, (snapshot) => {
+            allData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderMarkers(allData);
+            if(currentUser && currentUser.uid === ADMIN_UID) updateAdminDashboard(allData);
+        });
+    }
+
+    function renderMarkers(data) {
+        markersLayer.clearLayers();
+        const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
+        data.forEach(p => {
+            // ถ้าไม่ใช่ Admin จะเห็นเฉพาะจุดที่ผ่านการอนุมัติแล้วเท่านั้น
+            if(!isAdmin && p.status !== 'approved') return;
+            
+            const isPending = p.status === 'pending';
+            const marker = L.marker([p.lat, p.lng], {
+                icon: L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class='w-10 h-10 ${isPending ? "aed-marker-pending" : "aed-marker-approved"}'><i class='fa-solid fa-heart-pulse'></i></div>`,
+                    iconSize: [40, 40], iconAnchor: [20, 20], popupAnchor: [0, -25]
+                })
+            });
+
+            let popupHtml = `
+                <div class="p-1 font-kanit">
+                    <h3 class="font-bold text-gray-800">${p.name} ${isPending ? '<span class="text-orange-500 text-xs">(รอตรวจสอบ)</span>' : ''}</h3>
+                    <p class="text-[11px] text-gray-500 mb-2">${p.detail}</p>
+                    <a href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" class="block w-full bg-blue-600 text-white text-center py-2 rounded-lg text-[10px] font-bold mb-1">นำทาง (Google Maps)</a>`;
+            
+            if (isAdmin && isPending) {
+                popupHtml += `<button onclick="approveAED('${p.id}')" class="w-full bg-green-500 text-white py-2 rounded-lg text-[10px] font-bold mb-1"><i class="fa-solid fa-check mr-1"></i> อนุมัติจุดนี้</button>`;
+            }
+            if (isAdmin) {
+                popupHtml += `<button onclick="deleteAED('${p.id}')" class="w-full bg-red-100 text-red-600 py-1.5 rounded-lg text-[9px] font-bold">ลบจุดนี้</button>`;
+            }
+
+            popupHtml += `</div>`;
+            marker.bindPopup(popupHtml, { className: 'custom-popup' });
+            markersLayer.addLayer(marker);
+        });
+    }
+
+    function locateUser() {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const { latitude, longitude } = pos.coords;
+            map.setView([latitude, longitude], 17);
+            if (userMarker) map.removeLayer(userMarker);
+            userMarker = L.marker([latitude, longitude], { 
+                icon: L.divIcon({ className: 'user-pin', iconSize: [20, 20], iconAnchor: [10, 10] }) 
+            }).addTo(map);
+        }, null, { enableHighAccuracy: true });
+    }
+
+    async function useCurrentLocationForAdd() {
+        const statusText = document.getElementById('gps-status');
+        statusText.innerText = "📍 กำลังดึงพิกัด GPS...";
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const { latitude, longitude } = pos.coords;
+            document.getElementById('lat-input').value = latitude;
+            document.getElementById('lng-input').value = longitude;
+            map.setView([latitude, longitude], 18);
+            if (tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker([latitude, longitude]).addTo(map);
+            statusText.innerText = "✅ ดึงพิกัดสำเร็จ!";
+            statusText.className = "text-[10px] text-green-600 font-bold";
+        }, () => alert("กรุณาเปิด GPS"), { enableHighAccuracy: true });
+    }
+
+    async function saveAED(e) {
+        e.preventDefault();
+        const btn = document.getElementById('save-btn');
+        const lat = parseFloat(document.getElementById('lat-input').value);
+        const lng = parseFloat(document.getElementById('lng-input').value);
+
+        if(!lat || !lng) return alert("กรุณาระบุพิกัดก่อนครับ");
+
+        btn.disabled = true; btn.innerText = "กำลังประมวลผลพื้นที่...";
+        
+        const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
+        const targetStatus = isAdmin ? 'approved' : 'pending';
+
+        let district = "ไม่ระบุ", province = "ไม่ระบุ";
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`);
+            const json = await res.json();
+            district = json.address.amphoe || json.address.district || district;
+            province = json.address.province || province;
+        } catch(e) { console.warn("Reverse Geocoding failed"); }
+
+        try {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'aed_locations'), {
+                name: document.getElementById('location-name').value,
+                detail: document.getElementById('location-detail').value,
+                lat, lng, district, province,
+                status: targetStatus,
+                createdBy: currentUser.uid,
+                creatorName: currentUser.displayName,
+                timestamp: serverTimestamp()
+            });
+            alert(isAdmin ? "บันทึกและอนุมัติจุดติดตั้งเรียบร้อยแล้ว!" : "ส่งข้อมูลสำเร็จ! รอเจ้าหน้าที่อนุมัติครับ");
+            closeModal();
+        } catch(err) { alert(err.message); }
+        btn.disabled = false; btn.innerText = "บันทึกข้อมูล";
+    }
+
+    function updateAdminDashboard(data) {
+        const stats = data.reduce((acc, curr) => {
+            acc.total++;
+            acc[curr.status === 'approved' ? 'approved' : 'pending']++;
+            const areaKey = `${curr.province || 'ไม่ระบุ'} - ${curr.district || 'ไม่ระบุ'}`;
+            acc.areas[areaKey] = (acc.areas[areaKey] || 0) + 1;
+            return acc;
+        }, { total: 0, pending: 0, approved: 0, areas: {} });
+
+        document.getElementById('stat-total').innerText = stats.total;
+        document.getElementById('stat-pending').innerText = stats.pending;
+        document.getElementById('stat-approved').innerText = stats.approved;
+        document.getElementById('stat-districts').innerText = Object.keys(stats.areas).length;
+
+        let areaHtml = "";
+        Object.entries(stats.areas).sort((a,b) => b[1] - a[1]).forEach(([name, count]) => {
+            areaHtml += `<div class="flex justify-between items-center text-xs border-b pb-2"><span>${name}</span><span class="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">${count}</span></div>`;
+        });
+        document.getElementById('area-stats-list').innerHTML = areaHtml;
+
+        let tableHtml = "";
+        data.forEach(p => {
+            tableHtml += `
+                <tr class="border-b hover:bg-gray-50 transition-colors">
+                    <td class="p-3"><p class="font-bold text-gray-800">${p.name}</p><p class="text-[9px] text-gray-400">${p.creatorName || 'Anonymous'}</p></td>
+                    <td class="p-3 text-[10px]">${p.district}<br><span class="text-gray-400">${p.province}</span></td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${p.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">${p.status.toUpperCase()}</span></td>
+                    <td class="p-3 text-right">
+                        <div class="flex justify-end gap-3">
+                            ${p.status === 'pending' ? `<button onclick="approveAED('${p.id}')" class="text-green-500 hover:scale-125 transition-all"><i class="fa-solid fa-circle-check text-lg"></i></button>` : `<i class="fa-solid fa-circle-check text-gray-200 text-lg"></i>`}
+                            <button onclick="deleteAED('${p.id}')" class="text-red-300 hover:text-red-600 transition-all"><i class="fa-solid fa-trash-can text-lg"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+        });
+        document.getElementById('admin-table-body').innerHTML = tableHtml;
+    }
+
+    async function approveAED(id) { if(confirm("อนุมัติจุดติดตั้งนี้ให้ปรากฏสู่สาธารณะ?")) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id), { status: 'approved' }); }
+    async function deleteAED(id) { if(confirm("ลบจุดนี้ถาวร? ข้อมูลไม่สามารถกู้คืนได้")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'aed_locations', id)); }
+
+    function toggleAdminView() {
+        const panel = document.getElementById('admin-view');
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function toggleAddMode() {
+        if (!currentUser) {
+            if (confirm("คุณต้องเข้าสู่ระบบก่อนจึงจะสามารถปักหมุดแจ้งพิกัดได้ ต้องการ Login หรือไม่?")) {
+                loginWithGoogle();
+            }
+            return; 
         }
-    </script>
+        isAddMode = true;
+        alert("แตะที่ตำแหน่งบนแผนที่เพื่อปักหมุดครับ");
+    }
+
+    function closeModal() { document.getElementById('add-modal').classList.add('hidden'); isAddMode = false; if(tempMarker) map.removeLayer(tempMarker); }
+
+    function exportToCSV() {
+        let csv = "สถานที่,รายละเอียด,อำเภอ,จังหวัด,พิกัด(Lat),พิกัด(Lng),ผู้แจ้ง,สถานะ\n";
+        allData.forEach(p => { csv += `"${p.name}","${p.detail}","${p.district}","${p.province}",${p.lat},${p.lng},"${p.creatorName}","${p.status}"\n`; });
+        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `Report_AED_Map_${new Date().toLocaleDateString('th-TH')}.csv`;
+        link.click();
+    }
+</script>
 </body>
 </html>
