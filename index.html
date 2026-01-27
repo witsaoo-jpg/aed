@@ -359,7 +359,19 @@
             panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
         }
 
-        function toggleAddMode() { if(!currentUser) { loginWithGoogle(); return; } isAddMode = true; alert("แตะที่ตำแหน่งบนแผนที่เพื่อปักหมุดครับ"); }
+       function toggleAddMode() {
+    // ถ้ายังไม่ Login ให้แจ้งเตือนและเรียกฟังก์ชัน Login
+    if (!currentUser) {
+        if (confirm("คุณต้องเข้าสู่ระบบก่อนจึงจะสามารถปักหมุดแจ้งพิกัดได้ ต้องการ Login หรือไม่?")) {
+            loginWithGoogle();
+        }
+        return; 
+    }
+    
+    // ถ้า Login แล้วถึงจะยอมให้เปิดโหมดปักหมุด
+    isAddMode = true;
+    alert("แตะที่ตำแหน่งบนแผนที่เพื่อปักหมุดครับ");
+}
         function closeModal() { document.getElementById('add-modal').classList.add('hidden'); isAddMode = false; if(tempMarker) map.removeLayer(tempMarker); }
 
         function exportToCSV() {
