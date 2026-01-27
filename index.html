@@ -220,39 +220,45 @@
     }
 
     function renderMarkers(data) {
-        markersLayer.clearLayers();
-        const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
-        data.forEach(p => {
-            // ถ้าไม่ใช่ Admin จะเห็นเฉพาะจุดที่ผ่านการอนุมัติแล้วเท่านั้น
-            if(!isAdmin && p.status !== 'approved') return;
-            
-            const isPending = p.status === 'pending';
-            const marker = L.marker([p.lat, p.lng], {
-                icon: L.divIcon({
-                    className: 'custom-div-icon',
-                    html: `<div class='w-10 h-10 ${isPending ? "aed-marker-pending" : "aed-marker-approved"}'><i class='fa-solid fa-heart-pulse'></i></div>`,
-                    iconSize: [40, 40], iconAnchor: [20, 20], popupAnchor: [0, -25]
-                })
-            });
+    markersLayer.clearLayers();
+    // เช็คว่าคนนี้คือ Admin หรือไม่
+    const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
+    
+    data.forEach(p => {
+        // --- เงื่อนไขการแสดงผล ---
+        // ถ้าเป็นคนทั่วไป (ไม่ Login) จะเห็นเฉพาะหมุดที่ status เป็น 'approved'
+        // ถ้าเป็น Admin จะเห็นหมุดทั้งหมด (รวมถึงหมุดที่รอตรวจสอบด้วย)
+        if (!isAdmin && p.status !== 'approved') return;
 
-            let popupHtml = `
-                <div class="p-1 font-kanit">
-                    <h3 class="font-bold text-gray-800">${p.name} ${isPending ? '<span class="text-orange-500 text-xs">(รอตรวจสอบ)</span>' : ''}</h3>
-                    <p class="text-[11px] text-gray-500 mb-2">${p.detail}</p>
-                    <a href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" class="block w-full bg-blue-600 text-white text-center py-2 rounded-lg text-[10px] font-bold mb-1">นำทาง (Google Maps)</a>`;
-            
-            if (isAdmin && isPending) {
-                popupHtml += `<button onclick="approveAED('${p.id}')" class="w-full bg-green-500 text-white py-2 rounded-lg text-[10px] font-bold mb-1"><i class="fa-solid fa-check mr-1"></i> อนุมัติจุดนี้</button>`;
-            }
-            if (isAdmin) {
-                popupHtml += `<button onclick="deleteAED('${p.id}')" class="w-full bg-red-100 text-red-600 py-1.5 rounded-lg text-[9px] font-bold">ลบจุดนี้</button>`;
-            }
-
-            popupHtml += `</div>`;
-            marker.bindPopup(popupHtml, { className: 'custom-popup' });
-            markersLayer.addLayer(marker);
+        const isPending = p.status === 'pending';
+        const marker = L.marker([p.lat, p.lng], {
+            icon: L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class='w-10 h-10 ${isPending ? "aed-marker-pending" : "aed-marker-approved"}'><i class='fa-solid fa-heart-pulse'></i></div>`,
+                iconSize: [40, 40], iconAnchor: [20, 20], popupAnchor: [0, -25]
+            })
         });
-    }
+
+        // สร้าง Popup
+        let popupHtml = `
+            <div class="p-1 font-kanit">
+                <h3 class="font-bold text-gray-800">${p.name}</h3>
+                <p class="text-[11px] text-gray-500 mb-2">${p.detail}</p>
+                <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank" class="block w-full bg-blue-600 text-white text-center py-2 rounded-lg text-[10px] font-bold mb-1">นำทาง (Google Maps)</a>`;
+        
+        // ถ้าเป็น Admin ให้โชว์ปุ่ม "ลบ" หรือ "อนุมัติ" ใน Popup ด้วย
+        if (isAdmin) {
+            if (isPending) {
+                popupHtml += `<button onclick="approveAED('${p.id}')" class="w-full bg-green-500 text-white py-2 rounded-lg text-[10px] font-bold mb-1">อนุมัติหมุดนี้</button>`;
+            }
+            popupHtml += `<button onclick="deleteAED('${p.id}')" class="w-full bg-red-100 text-red-600 py-1.5 rounded-lg text-[9px] font-bold">ลบจุดนี้</button>`;
+        }
+
+        popupHtml += `</div>`;
+        marker.bindPopup(popupHtml, { className: 'custom-popup' });
+        markersLayer.addLayer(marker);
+    });
+}
 
     function locateUser() {
         navigator.geolocation.getCurrentPosition((pos) => {
